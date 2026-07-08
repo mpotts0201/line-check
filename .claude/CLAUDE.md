@@ -10,7 +10,7 @@ Primary goal: a tight, demo-able vertical slice with senior-level architecture (
 
 This repo is developed in a **split Windows/WSL2 workflow**:
 
-- **Claude Code runs in WSL2** and accesses this repo via `/mnt/c/dev/linecheck`
+- **Claude Code runs in WSL2** and accesses this repo via `/mnt/c/Users/mpott/Projects/career/line-check`
 - **All commands run on the Windows side by the human** — Metro, installs, builds
 - The dev device is a **physical iPhone via Expo Go / dev builds**, connecting to Metro over LAN
 

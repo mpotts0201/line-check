@@ -27,3 +27,5 @@ All writes go to a local SQLite database immediately — the app is fully functi
 The demo in one toggle: enable airplane mode, complete an entire audit — checklist, photos, signature — then re-enable wifi and watch the pending badge flip to synced.
 
 ![alt text](./assets/images/app-flow.png)
+
+![alt text](./assets/images/network-flow.png)
