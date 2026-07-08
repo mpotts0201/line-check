@@ -1,50 +1,29 @@
-# Welcome to your Expo app 👋
+# LineCheck
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**A digital clipboard for restaurant food-safety line checks — built to work in the walk-in cooler, where there's no wifi.**
 
-## Get started
+## The problem
 
-1. Install dependencies
+Before opening each day, restaurant managers perform a "line check": a station-by-station food-safety walkthrough. Cooler temperatures, prep-line fridges, fryer oil, sanitizer levels — each item is checked, recorded, and signed off, because health inspectors and corporate audits require proof it happened.
 
-   ```bash
-   npm install
-   ```
+Today this mostly happens on paper. Paper gets lost, can't hold photo evidence, and can't be reviewed remotely by a district manager. And the obvious fix — a mobile app — usually fails in the exact place the check happens: a walk-in cooler is a sealed metal box with no connectivity. Any tool that assumes a network connection dies mid-audit.
 
-2. Start the app
+LineCheck is offline-first by design: every action works instantly with no connection, and the app syncs automatically when the device comes back online.
 
-   ```bash
-   npx expo start
-   ```
+## How it works
 
-In the output, you'll find options to open the app in a
+The app mirrors the manager's actual morning walk:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+1. **Locations** — Select the restaurant being audited. (Managers and district managers may cover several.)
+2. **Audit checklist** — Today's line check, grouped by station (walk-in cooler, prep line, fryers). This is home base during the walk; each item shows its status at a glance.
+3. **Item detail** — Standing at a station, the manager records the result: pass/fail, a temperature reading, an optional photo (e.g., a damaged door seal), and notes. Save, and back to the checklist for the next station.
+4. **Review & sign** — At the end of the walk: a summary of results and a signature capture. Signing is the compliance moment — the manager's formal attestation that the check was completed.
+5. **History** — Past audits with their sync status. An audit completed offline shows as *pending* until connectivity returns, then flips to *synced* — no user action required.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Offline-first architecture (summary)
 
-## Get a fresh project
+All writes go to a local SQLite database immediately — the app is fully functional in airplane mode. Each mutation is also appended to a sync queue, which is flushed to the backend (Supabase) whenever connectivity is detected: audits first, then items, then photo uploads, with retry and backoff. Conflicts resolve last-write-wins on `updatedAt`. Sync state is always visible in the UI rather than hidden.
 
-When you're ready, run:
+The demo in one toggle: enable airplane mode, complete an entire audit — checklist, photos, signature — then re-enable wifi and watch the pending badge flip to synced.
 
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+![alt text](./assets/images/app-flow.png)
