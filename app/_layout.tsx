@@ -12,7 +12,13 @@ export default function RootLayout() {
         provision(db);        // fire-and-forget: network never blocks launch
       }}
     >
-      <Stack />
+      <Stack>
+        <Stack.Screen name="index" options={{ title: "Locations" }} />
+        <Stack.Screen name="history" options={{ title: "History" }} />
+        <Stack.Screen name="audit/[locationId]" options={{ title: "Line Check" }} />
+        <Stack.Screen name="audit/item/[itemId]" options={{ title: "Check Item" }} />
+        <Stack.Screen name="audit/review/[auditId]" options={{ title: "Review & Sign" }} />
+      </Stack>
     </SQLiteProvider>
   );
 }
