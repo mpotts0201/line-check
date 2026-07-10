@@ -14,8 +14,6 @@ export default function Locations() {
     getLocations(db).then(setLocations);
   }, [db]);
 
-  console.log(locations)
-
   return (
     <FlatList
       data={locations}
