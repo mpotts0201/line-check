@@ -12,6 +12,16 @@ export type AuditItem = {
   requiresTemp?: number;
 };
 
+// The only columns editable from the item-detail screen. Derived from AuditItem
+// via Pick so the value types stay in sync with the row shape; Partial so a
+// caller can update any subset. Identity/snapshot columns (id, auditId,
+// templateId, station, label) and the joined requiresTemp are deliberately
+// absent — passing one is a compile error, so the mutability boundary is
+// enforced by the type, not a runtime check.
+export type MutableAuditItemFields = Partial<
+  Pick<AuditItem, "result" | "tempReading" | "note">
+>;
+
 // Finds today's draft audit for this location, or instantiates one from templates.
 export async function getOrCreateTodaysAudit(
   db: SQLiteDatabase,

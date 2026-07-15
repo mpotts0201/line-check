@@ -15,7 +15,7 @@ Workflow rules (for me and for Claude Code):
 
 ### T1 — Repository functions: getAuditItem + updateAuditItem
 - [x] `getAuditItem(db, id)` in `src/db/audits.ts` — single row, same JOIN as `getAuditItems` so `requiresTemp` comes through, `getFirstAsync`. Comment block explaining the JOIN included.
-- [ ] `MutableAuditItemFields` type in `src/db/audits.ts` — `Partial<>` of the mutable columns only (`result`, `tempReading`, `note`). Callers must not be able to overwrite `id`, `auditId`, `templateId`, or snapshot columns (`station`, `label`); enforce at the type level, not runtime checks. Short comment above it stating the mutability boundary.
+- [x] `MutableAuditItemFields` type in `src/db/audits.ts` — `Partial<>` of the mutable columns only (`result`, `tempReading`, `note`). Callers must not be able to overwrite `id`, `auditId`, `templateId`, or snapshot columns (`station`, `label`); enforce at the type level, not runtime checks. Short comment above it stating the mutability boundary.
 - [ ] `updateAuditItem(db, id, fields: MutableAuditItemFields)` — UPDATE built from the provided keys, stamps `updatedAt` inside the function (callers never pass it). Short comment above it explaining the boundary + why `updatedAt` is function-owned (last-write-wins sync key).
 - AC: both compile, `getAuditItem` returns `requiresTemp`, passing a non-mutable column in `fields` is a type error.
 - Files: `src/db/audits.ts`
