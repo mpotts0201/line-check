@@ -1,5 +1,5 @@
 import * as Crypto from "expo-crypto";
-import { type SQLiteDatabase } from "expo-sqlite";
+import { type SQLiteBindValue, type SQLiteDatabase } from "expo-sqlite";
 
 export type AuditItem = {
   id: string;
@@ -86,6 +86,42 @@ export async function getAuditItem(
      FROM audit_items ai
      LEFT JOIN checklist_templates ct ON ct.id = ai.templateId
      WHERE ai.id = ?`,
+    id
+  );
+}
+
+// Patches the mutable columns of one item. `fields` is typed so identity and
+// snapshot columns can't be passed (see MutableAuditItemFields). The SET clause
+// is built only from the whitelisted `columns` literals below — never from
+// caller-supplied keys — so column names can't be injected; values ride bound
+// `?` params. updatedAt is stamped HERE, never accepted from callers: it is the
+// last-write-wins clock the sync engine compares on, so the repository owns it.
+export async function updateAuditItem(
+  db: SQLiteDatabase,
+  id: string,
+  fields: MutableAuditItemFields
+): Promise<void> {
+  const columns = ["result", "tempReading", "note"] as const;
+
+  const setParts: string[] = [];
+  const values: SQLiteBindValue[] = [];
+  for (const c of columns) {
+    const v = fields[c];
+    if (v === undefined) continue; // key absent → leave that column untouched
+    setParts.push(`${c} = ?`);
+    values.push(v); // narrowed: v is not undefined here, so it's a valid bind value
+  }
+
+  // Nothing to change → don't bump updatedAt. Touching the sync clock on a
+  // no-op edit would falsely mark this row newer than the server's copy.
+  if (setParts.length === 0) return;
+
+  setParts.push("updatedAt = ?");
+  values.push(new Date().toISOString());
+
+  await db.runAsync(
+    `UPDATE audit_items SET ${setParts.join(", ")} WHERE id = ?`,
+    ...values,
     id
   );
 }
