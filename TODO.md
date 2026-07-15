@@ -1,0 +1,79 @@
+# TODO — LineCheck
+
+Workflow rules (for me and for Claude Code):
+- **One bullet per session, not one ticket.** Claude Code implements exactly one `- [ ]` checkbox, then stops — even if the next bullet is obvious, even if it's a one-line change. No batching, no "while I'm here." I set the pace, not the agent.
+- Start in Plan Mode. Approve the plan before any file changes.
+- Stop conditions per session: the single bullet is done, `npx tsc --noEmit` clean, nothing outside the ticket's listed files touched, checkbox marked `[x]`.
+- A ticket's AC line is checked only when its last bullet lands — that session runs the full AC before closing the ticket.
+- I read every diff before merging. The bar: I can explain any line if asked. Anything I can't explain, I ask Claude Code to walk me through before merge.
+- Move finished tickets to `## Done` in the same commit that closes them.
+- Architecture is settled (see DECISIONS.md). Tickets do not relitigate it.
+
+---
+
+## Up Next
+
+### T1 — Repository functions: getAuditItem + updateAuditItem
+- [ ] `getAuditItem(db, id)` in `src/db/audits.ts` — single row, same JOIN as `getAuditItems` so `requiresTemp` comes through, `getFirstAsync`.
+- [ ] `updateAuditItem(db, id, fields)` — UPDATE, stamps `updatedAt` inside the function (callers never pass it).
+- [ ] `fields` type: `Partial<>` of mutable columns only (status, tempF, note) — define a `MutableAuditItemFields` type. Callers must not be able to overwrite `id`, `auditId`, `templateId`, or snapshot columns; enforce at the type level, not runtime checks.
+- [ ] Add a short comment block above each function explaining the JOIN and the mutability boundary (these comments are for me).
+- AC: both compile, `getAuditItem` returns `requiresTemp`, passing a non-mutable column in `fields` is a type error.
+- Files: `src/db/audits.ts`
+
+### T2 — Route stubs
+- [ ] Create `app/audit/item/[itemId].tsx` — minimal: read param, render it in a `<Text>`.
+- [ ] Create `app/audit/review/[auditId].tsx` — same.
+- AC: `npx tsc --noEmit` clean; typed-route pushes to both targets compile; tapping a checklist row navigates without crash.
+- Files: the two new route files only.
+
+### T3 — Item detail screen
+- [ ] Build out `app/audit/item/[itemId].tsx`: load via `getAuditItem` on mount.
+- [ ] Label heading (snapshotted label, not a template lookup).
+- [ ] Pass / Fail / N/A segmented buttons.
+- [ ] Temp `TextInput` (numeric keyboard) rendered ONLY when `requiresTemp` is truthy.
+- [ ] Note `TextInput` (multiline).
+- [ ] Save button → `updateAuditItem` → `router.back()`.
+- AC: save a Fail with note + temp, force-quit, reopen, navigate back in — values persisted. Temp field absent on non-temp items. No SQL in the screen file (repository layer only).
+- Files: `app/audit/item/[itemId].tsx` only. Depends: T1, T2.
+
+### T4 — Checklist reflects status on return
+- [ ] `app/audit/[locationId].tsx`: refetch items on screen focus (`useFocusEffect`).
+- [ ] Row shows ✓ / ✗ / NA / — based on status.
+- AC: save an item, go back, row updated without app restart. No duplicate audits created by the refetch.
+- Files: `app/audit/[locationId].tsx` only. Depends: T3.
+
+### T5 — Review & sign screen
+- [ ] Build out `app/audit/review/[auditId].tsx`: counts (pass / fail / na / unanswered), failed-items list with notes, signature placeholder box.
+- [ ] Complete button: sets audit status = 'completed' + `completedAt`, then navigates to History.
+- [ ] Decision (record in DECISIONS.md): Complete is disabled while unanswered items exist.
+- AC: counts match the checklist screen; completing is blocked with unanswered items; completed audit no longer returned by `getOrCreateTodaysAudit` (a new draft starts tomorrow, or same-day re-audit decision documented).
+- Files: `app/audit/review/[auditId].tsx`, `src/db/audits.ts` (new `completeAudit` fn), DECISIONS.md. Depends: T2, T4.
+
+### T6 — History screen
+- [ ] New route `app/history.tsx` (or tab — my call at build time).
+- [ ] List completed audits: location name, date, pass/fail counts via one GROUP BY aggregate query (no N+1).
+- [ ] Sync status text, hardcoded "Not synced" for now.
+- AC: counts match the review screen for the same audit; query is a single aggregate, verified in the repository function.
+- Files: `app/history.tsx`, `src/db/audits.ts`. Depends: T5.
+
+### T7 — Sync engine (crown jewel — split, do not merge tickets)
+**After 7b lands: one extra session where Claude Code walks me through the flush loop line by line — queue draining, idempotency, backoff, and what happens on a mid-flush crash. This is the piece I'll be asked about.**
+
+- [ ] **7a** — `sync_queue` table migration; enqueue audit + items rows on `completeAudit`. AC: completing an audit inserts queue rows in the same transaction.
+- [ ] **7b** — NetInfo listener + flush loop: drain queue on connectivity, upsert to Supabase keyed on device UUIDs (idempotent — re-running a flush is a no-op), retry with backoff, per-row status. AC: airplane mode → complete audit → disable airplane mode → rows appear in Supabase without duplicates, including after a forced mid-flush kill.
+- [ ] **7c** — Photo capture on item detail + upload to `audit-photos` bucket in the flush path. AC: photo path stored locally offline; file lands in the bucket on sync.
+- [ ] **7d** — History shows real "Synced ✓" badge backed by queue state. AC: badge flips only after Supabase rows confirmed. **MILESTONE: recruiter email goes out this day.**
+
+### T8 — Week 3 polish
+- [ ] Reanimated touches (status button press, list transitions — small).
+- [ ] README: demo GIF, architecture diagram, link DECISIONS.md.
+- [ ] EAS dev build; record airplane-mode demo end-to-end.
+
+---
+
+## Done
+- [x] Locations screen (SQLite → FlatList → typed route push).
+- [x] Checklist screen renders; `getOrCreateTodaysAudit` resumes today's draft across restarts.
+- [x] Provisioning down-sync (locations + templates from Supabase, fire-and-forget).
+- [x] Migrations, WAL mode, repository layer scaffolding.

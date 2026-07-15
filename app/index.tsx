@@ -22,7 +22,7 @@ export default function Locations() {
       renderItem={({ item }) => (
         <Pressable
           style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-          // onPress={() => router.push(`/audit/${item.id}`)}
+          onPress={() => router.push(`/audit/${item.id}`)}
         >
           <Text style={styles.name}>{item.name}</Text>
           <Text style={styles.address}>{item.address}</Text>
