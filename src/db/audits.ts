@@ -63,3 +63,19 @@ export async function getAuditItems(
     auditId
   );
 }
+
+// Single-item read. Uses the SAME LEFT JOIN as getAuditItems so requiresTemp
+// (which lives on checklist_templates, not audit_items) comes through — the
+// item screen needs it to decide whether to show the temp field.
+export async function getAuditItem(
+  db: SQLiteDatabase,
+  id: string
+): Promise<AuditItem | null> {
+  return db.getFirstAsync<AuditItem>(
+    `SELECT ai.*, ct.requiresTemp
+     FROM audit_items ai
+     LEFT JOIN checklist_templates ct ON ct.id = ai.templateId
+     WHERE ai.id = ?`,
+    id
+  );
+}
