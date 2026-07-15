@@ -37,14 +37,14 @@ Workflow rules (for me and for Claude Code):
 - Files: `app/audit/item/[itemId].tsx` only. Depends: T1, T2.
 
 ### T4 — Checklist reflects status on return
-- [ ] `app/audit/[locationId].tsx`: refetch items on screen focus (`useFocusEffect`).
-- [ ] Row shows ✓ / ✗ / NA / — based on status.
+- [x] `app/audit/[locationId].tsx`: refetch items on screen focus (`useFocusEffect`). Landed early with the checklist screen — already implemented (lines 15–22).
+- [ ] Row shows ✓ / ✗ / NA / — based on `result` (currently renders text PASS/FAIL/NA/— — this bullet is the swap to glyphs).
 - AC: save an item, go back, row updated without app restart. No duplicate audits created by the refetch.
-- Files: `app/audit/[locationId].tsx` only. Depends: T3.
+- Files: `app/audit/[locationId].tsx` only. Depends: T3 — for AC verification only; the refetch code already exists.
 
 ### T5 — Review & sign screen
 - [ ] Build out `app/audit/review/[auditId].tsx`: counts (pass / fail / na / unanswered), failed-items list with notes, signature placeholder box.
-- [ ] Complete button: sets audit status = 'completed' + `completedAt`, then navigates to History.
+- [ ] Complete button: sets audit status = `'complete'` (matches CLAUDE.md's `'draft' | 'complete'` model — NOT `'completed'`; `getOrCreateTodaysAudit` and T6's history query must use this exact string) + `completedAt`, then navigates to History.
 - [ ] Decision (record in DECISIONS.md): Complete is disabled while unanswered items exist.
 - AC: counts match the checklist screen; completing is blocked with unanswered items; completed audit no longer returned by `getOrCreateTodaysAudit` (a new draft starts tomorrow, or same-day re-audit decision documented).
 - Files: `app/audit/review/[auditId].tsx`, `src/db/audits.ts` (new `completeAudit` fn), DECISIONS.md. Depends: T2, T4.
