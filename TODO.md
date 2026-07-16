@@ -22,8 +22,8 @@ Workflow rules (for me and for Claude Code):
 
 ### T2 — Route stubs
 - [x] Create `app/audit/item/[itemId].tsx` — minimal: read param, render it in a `<Text>`.
-- [ ] Create `app/audit/review/[auditId].tsx` — same.
-- AC: `npx tsc --noEmit` clean; typed-route pushes to both targets compile; tapping a checklist row navigates without crash.
+- [x] Create `app/audit/review/[auditId].tsx` — same.
+- [x] AC: `npx tsc --noEmit` clean; typed-route pushes to both targets compile; tapping a checklist row navigates without crash.
 - Files: the two new route files only.
 
 ### T3 — Item detail screen
