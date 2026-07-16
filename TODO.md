@@ -39,7 +39,6 @@ Workflow rules (for me and for Claude Code):
 
 ### T4 — Checklist reflects status on return
 - [x] `app/audit/[locationId].tsx`: refetch items on screen focus (`useFocusEffect`). Landed early with the checklist screen — already implemented (lines 15–22).
-- [ ] Row shows ✓ / ✗ / NA / — based on `result` (currently renders text PASS/FAIL/NA/— — this bullet is the swap to glyphs).
 - AC: save an item, go back, row updated without app restart. No duplicate audits created by the refetch.
 - Files: `app/audit/[locationId].tsx` only. Depends: T3 — for AC verification only; the refetch code already exists.
 
