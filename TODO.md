@@ -56,6 +56,15 @@ Workflow rules (for me and for Claude Code):
 - [x] AC: counts match the review screen for the same audit; query is a single aggregate, verified in the repository function.
 - Files: `app/history.tsx`, `src/db/audits.ts` (new `getCompletedAudits`), `app/audit/review/[auditId].tsx` (post-complete nav → `/history`), `app/_layout.tsx` (History header button). Depends: T5.
 
+### T6.5 — Read-only audit detail (tap a History row)
+Close the vertical slice: a completed audit in History should be openable to see what was signed off. Reuse the review screen in a read-only mode keyed on `status`, rather than adding a new screen (per CLAUDE.md's "no extra screens").
+- [ ] Make `app/history.tsx` rows tappable → `router.push('/audit/review/${audit.id}')`.
+- [ ] Review screen read-only mode: load the audit's `status` (new `getAudit(db, id)` in `src/db/audits.ts`); when `'complete'`, hide the Complete button, the gate hint, and the signature-capture placeholder (show a static "Completed <date>" instead).
+- [ ] In read-only mode, list ALL items with result + temp + note (not just failures), so the row is a full record. Draft review flow (reached from the checklist) is unchanged: counts + failed-items summary + Complete.
+- [ ] Decision (DECISIONS.md): the review screen does double duty (pre-sign summary + post-sign read-only detail), branched on audit status — no new screen.
+- AC: tapping a completed History row shows every item's result/temp/note with no Complete button; counts match the History row and the pre-completion review; the draft review flow is untouched.
+- Files: `app/history.tsx`, `app/audit/review/[auditId].tsx`, `src/db/audits.ts` (new `getAudit`), DECISIONS.md. Depends: T6.
+
 ### T7 — Sync engine (crown jewel — split, do not merge tickets)
 **After 7b lands: one extra session where Claude Code walks me through the flush loop line by line — queue draining, idempotency, backoff, and what happens on a mid-flush crash. This is the piece I'll be asked about.**
 
