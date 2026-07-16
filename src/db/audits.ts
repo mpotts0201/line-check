@@ -125,3 +125,17 @@ export async function updateAuditItem(
     id
   );
 }
+
+// Marks a draft audit complete. Stamps completedAt; leaves signatureUri (a placeholder
+// in T5) and syncStatus (T7 owns it) untouched. Guarded on status = 'draft' so a re-tap
+// is idempotent and a completed audit can't be re-completed. Uses 'complete' (not
+// 'completed') per the CLAUDE.md status model. No sync_queue enqueue here — that is T7a.
+export async function completeAudit(
+  db: SQLiteDatabase,
+  auditId: string
+): Promise<void> {
+  await db.runAsync(
+    `UPDATE audits SET status = 'complete', completedAt = ? WHERE id = ? AND status = 'draft'`,
+    new Date().toISOString(), auditId
+  );
+}

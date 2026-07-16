@@ -43,11 +43,11 @@ Workflow rules (for me and for Claude Code):
 - Files: `app/audit/[locationId].tsx` only. Depends: T3 — for AC verification only; the refetch code already exists.
 
 ### T5 — Review & sign screen
-- [ ] Build out `app/audit/review/[auditId].tsx`: counts (pass / fail / na / unanswered), failed-items list with notes, signature placeholder box.
-- [ ] Complete button: sets audit status = `'complete'` (matches CLAUDE.md's `'draft' | 'complete'` model — NOT `'completed'`; `getOrCreateTodaysAudit` and T6's history query must use this exact string) + `completedAt`, then navigates to History.
-- [ ] Decision (record in DECISIONS.md): Complete is disabled while unanswered items exist.
-- AC: counts match the checklist screen; completing is blocked with unanswered items; completed audit no longer returned by `getOrCreateTodaysAudit` (a new draft starts tomorrow, or same-day re-audit decision documented).
-- Files: `app/audit/review/[auditId].tsx`, `src/db/audits.ts` (new `completeAudit` fn), DECISIONS.md. Depends: T2, T4.
+- [x] Build out `app/audit/review/[auditId].tsx`: counts (pass / fail / na / unanswered), failed-items list with notes, signature placeholder box.
+- [x] Complete button: sets audit status = `'complete'` (matches CLAUDE.md's `'draft' | 'complete'` model — NOT `'completed'`; `getOrCreateTodaysAudit` and T6's history query must use this exact string) + `completedAt`, then navigates to History. (Navigates to Locations for now; T6 switches to History — see DECISIONS.md.)
+- [x] Decision (record in DECISIONS.md): Complete is disabled while unanswered items exist. Enforced via new `auditCompleteSchema` in `src/validation/audit.ts` (Zod gate).
+- [x] AC: counts match the checklist screen; completing is blocked with unanswered items; completed audit no longer returned by `getOrCreateTodaysAudit` (a new draft starts tomorrow, or same-day re-audit decision documented). Same-day re-audit allowed — documented in DECISIONS.md.
+- Files: `app/audit/review/[auditId].tsx`, `src/db/audits.ts` (new `completeAudit` fn), `src/validation/audit.ts` (new `auditCompleteSchema` gate), DECISIONS.md. Depends: T2, T4.
 
 ### T6 — History screen
 - [ ] New route `app/history.tsx` (or tab — my call at build time).
