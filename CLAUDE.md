@@ -7,6 +7,7 @@ LineCheck is an **offline-first restaurant operations audit app** (React Native,
 Primary goal: a tight, demo-able vertical slice with senior-level architecture (offline-first + sync), not a feature buffet.
 
 ## Critical environment rules — READ FIRST
+Before proposing architectural changes, read DECISIONS.md. Append new significant decisions there with date and rationale.
 
 This repo is developed in a **split Windows/WSL2 workflow**:
 
