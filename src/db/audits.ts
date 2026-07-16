@@ -139,3 +139,34 @@ export async function completeAudit(
     new Date().toISOString(), auditId
   );
 }
+
+export type AuditSummary = {
+  id: string;
+  locationId: string;
+  locationName: string;
+  completedAt: string | null;
+  passCount: number;
+  failCount: number;
+  naCount: number;
+};
+
+// Completed audits for the History screen, newest first. ONE aggregate query — location
+// name via JOIN, per-audit counts via conditional COUNT(CASE ...), GROUP BY audit id.
+// No N+1: the counts ride on the same row, never a follow-up query per audit. Unanswered
+// is deliberately not counted — the T5 completion gate guarantees it is 0 here.
+export async function getCompletedAudits(
+  db: SQLiteDatabase
+): Promise<AuditSummary[]> {
+  return db.getAllAsync<AuditSummary>(
+    `SELECT a.id, a.locationId, a.completedAt, l.name AS locationName,
+            COUNT(CASE WHEN ai.result = 'pass' THEN 1 END) AS passCount,
+            COUNT(CASE WHEN ai.result = 'fail' THEN 1 END) AS failCount,
+            COUNT(CASE WHEN ai.result = 'na'   THEN 1 END) AS naCount
+     FROM audits a
+     JOIN locations l ON l.id = a.locationId
+     LEFT JOIN audit_items ai ON ai.auditId = a.id
+     WHERE a.status = 'complete'
+     GROUP BY a.id
+     ORDER BY a.completedAt DESC`
+  );
+}

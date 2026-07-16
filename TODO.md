@@ -50,11 +50,11 @@ Workflow rules (for me and for Claude Code):
 - Files: `app/audit/review/[auditId].tsx`, `src/db/audits.ts` (new `completeAudit` fn), `src/validation/audit.ts` (new `auditCompleteSchema` gate), DECISIONS.md. Depends: T2, T4.
 
 ### T6 — History screen
-- [ ] New route `app/history.tsx` (or tab — my call at build time).
-- [ ] List completed audits: location name, date, pass/fail counts via one GROUP BY aggregate query (no N+1).
-- [ ] Sync status text, hardcoded "Not synced" for now.
-- AC: counts match the review screen for the same audit; query is a single aggregate, verified in the repository function.
-- Files: `app/history.tsx`, `src/db/audits.ts`. Depends: T5.
+- [x] New route `app/history.tsx` (or tab — my call at build time). (Stack screen; reached via post-complete nav + a History header button on Locations.)
+- [x] List completed audits: location name, date, pass/fail counts via one GROUP BY aggregate query (no N+1). (`getCompletedAudits`; counts include N/A to match the review screen.)
+- [x] Sync status text, hardcoded "Not synced" for now.
+- [x] AC: counts match the review screen for the same audit; query is a single aggregate, verified in the repository function.
+- Files: `app/history.tsx`, `src/db/audits.ts` (new `getCompletedAudits`), `app/audit/review/[auditId].tsx` (post-complete nav → `/history`), `app/_layout.tsx` (History header button). Depends: T5.
 
 ### T7 — Sync engine (crown jewel — split, do not merge tickets)
 **After 7b lands: one extra session where Claude Code walks me through the flush loop line by line — queue draining, idempotency, backoff, and what happens on a mid-flush crash. This is the piece I'll be asked about.**

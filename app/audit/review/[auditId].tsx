@@ -42,7 +42,7 @@ export default function ReviewSign() {
 
   async function onComplete() {
     await completeAudit(db, auditId);
-    router.replace("/"); // back to Locations; not left in the back stack (T6 → History)
+    router.replace("/history"); // to History; replace so the completed review isn't in the back stack
   }
 
   return (

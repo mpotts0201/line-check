@@ -1,5 +1,6 @@
-import { Stack } from "expo-router";
+import { Link, Stack } from "expo-router";
 import { SQLiteProvider } from "expo-sqlite";
+import { Text } from "react-native";
 import { migrate } from "../src/db";
 import { provision } from "../src/db/provision";
 
@@ -13,7 +14,19 @@ export default function RootLayout() {
       }}
     >
       <Stack>
-        <Stack.Screen name="index" options={{ title: "Locations" }} />
+        <Stack.Screen
+          name="index"
+          options={{
+            title: "Locations",
+            headerRight: () => (
+              <Link href="/history">
+                <Text style={{ fontSize: 16, color: "#1a1a1a", fontWeight: "600" }}>
+                  History
+                </Text>
+              </Link>
+            ),
+          }}
+        />
         <Stack.Screen name="history" options={{ title: "History" }} />
         <Stack.Screen name="audit/[locationId]" options={{ title: "Line Check" }} />
         <Stack.Screen name="audit/item/[itemId]" options={{ title: "Check Item" }} />
