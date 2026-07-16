@@ -27,14 +27,15 @@ Workflow rules (for me and for Claude Code):
 - Files: the two new route files only.
 
 ### T3 — Item detail screen
-- [ ] Build out `app/audit/item/[itemId].tsx`: load via `getAuditItem` on mount.
-- [ ] Label heading (snapshotted label, not a template lookup).
-- [ ] Pass / Fail / N/A segmented buttons.
-- [ ] Temp `TextInput` (numeric keyboard) rendered ONLY when `requiresTemp` is truthy.
-- [ ] Note `TextInput` (multiline).
-- [ ] Save button → `updateAuditItem` → `router.back()`.
-- AC: save a Fail with note + temp, force-quit, reopen, navigate back in — values persisted. Temp field absent on non-temp items. No SQL in the screen file (repository layer only).
-- Files: `app/audit/item/[itemId].tsx` only. Depends: T1, T2.
+- [x] Build out `app/audit/item/[itemId].tsx`: load via `getAuditItem` on mount.
+- [x] Label heading (snapshotted label, not a template lookup).
+- [x] Pass / Fail / N/A segmented buttons.
+- [x] Temp `TextInput` (numeric keyboard) rendered ONLY when `requiresTemp` is truthy.
+- [x] Note `TextInput` (multiline).
+- [x] Save button → `updateAuditItem` → `router.back()`.
+- [x] Zod validation layer (`src/validation/audit.ts`, `itemSaveSchema`): blank result rejected; temp required when `requiresTemp`. Reused by T5's completion gate. (Decision in DECISIONS.md.)
+- [x] AC: save a Fail with note + temp, force-quit, reopen, navigate back in — values persisted. Temp field absent on non-temp items. No SQL in the screen file (repository layer only).
+- Files: `app/audit/item/[itemId].tsx`, `src/validation/audit.ts`, `DECISIONS.md`. Depends: T1, T2.
 
 ### T4 — Checklist reflects status on return
 - [x] `app/audit/[locationId].tsx`: refetch items on screen focus (`useFocusEffect`). Landed early with the checklist screen — already implemented (lines 15–22).
