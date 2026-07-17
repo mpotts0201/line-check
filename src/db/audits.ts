@@ -140,6 +140,34 @@ export async function completeAudit(
   );
 }
 
+export type Audit = {
+  id: string;
+  locationId: string;
+  locationName: string;
+  status: "draft" | "complete";
+  startedAt: string;
+  completedAt: string | null;
+};
+
+// Single audit + its location name, for the read-only detail screen (History → tap).
+// Mirrors getCompletedAudits' `JOIN locations … AS locationName`, but one row via
+// getFirstAsync like getAuditItem. No status filter — generic; the caller (detail
+// screen) branches on `status`. Counts are NOT here: the screen derives them from
+// getAuditItems in-screen, exactly as the review screen does (no second aggregate).
+export async function getAudit(
+  db: SQLiteDatabase,
+  id: string
+): Promise<Audit | null> {
+  return db.getFirstAsync<Audit>(
+    `SELECT a.id, a.locationId, a.status, a.startedAt, a.completedAt,
+            l.name AS locationName
+     FROM audits a
+     JOIN locations l ON l.id = a.locationId
+     WHERE a.id = ?`,
+    id
+  );
+}
+
 export type AuditSummary = {
   id: string;
   locationId: string;
