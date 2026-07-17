@@ -27,7 +27,8 @@ export default function RootLayout() {
             ),
           }}
         />
-        <Stack.Screen name="history" options={{ title: "History" }} />
+        <Stack.Screen name="history/index" options={{ title: "History" }} />
+        <Stack.Screen name="history/[auditId]" options={{ title: "Audit Detail" }} />
         <Stack.Screen name="audit/[locationId]" options={{ title: "Line Check" }} />
         <Stack.Screen name="audit/item/[itemId]" options={{ title: "Check Item" }} />
         <Stack.Screen name="audit/review/[auditId]" options={{ title: "Review & Sign" }} />

@@ -1,8 +1,8 @@
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
 import { useCallback, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
-import { getCompletedAudits, type AuditSummary } from "../src/db/audits";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { getCompletedAudits, type AuditSummary } from "../../src/db/audits";
 
 // completedAt is an ISO string; show its date portion. Kept manual (no date lib, no
 // reliance on Hermes Intl) so it renders identically on every device.
@@ -12,6 +12,7 @@ function formatDate(iso: string | null): string {
 
 export default function History() {
   const db = useSQLiteContext();
+  const router = useRouter();
   const [audits, setAudits] = useState<AuditSummary[]>([]);
 
   // Refetch on focus — a just-completed audit (arriving via replace('/history')) is
@@ -29,7 +30,10 @@ export default function History() {
       contentContainerStyle={styles.list}
       ListEmptyComponent={<Text style={styles.empty}>No completed audits yet.</Text>}
       renderItem={({ item }) => (
-        <View style={styles.card}>
+        <Pressable
+          style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+          onPress={() => router.push(`/history/${item.id}`)}
+        >
           <View style={styles.headerRow}>
             <Text style={styles.name}>{item.locationName}</Text>
             <Text style={styles.date}>{formatDate(item.completedAt)}</Text>
@@ -40,7 +44,7 @@ export default function History() {
             <Count label="N/A" value={item.naCount} />
           </View>
           <Text style={styles.sync}>Not synced</Text>
-        </View>
+        </Pressable>
       )}
     />
   );
@@ -73,6 +77,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "#ddd",
   },
+  pressed: { opacity: 0.6 },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
