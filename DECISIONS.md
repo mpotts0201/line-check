@@ -67,3 +67,30 @@ switch the target to `/history`.
   reopening a completed record and contradicts the immutable-once-signed intent.
 - **Navigate straight to History now** — rejected; the route doesn't exist until T6, so
   it would land on Expo Router's "Unmatched Route" screen.
+
+---
+
+## 2026-07-17 — Read-only audit detail is a separate screen, not a review-screen mode
+
+**Decision:** A completed audit opened from History renders in a dedicated read-only
+screen (`app/history/[auditId].tsx`). History was promoted to a route directory —
+`history/index.tsx` (list) + `history/[auditId].tsx` (detail). The review screen
+(`app/audit/review/[auditId].tsx`) is unchanged and stays draft→sign only. This reverses
+T6.5's original sketch of reusing the review screen in a read-only mode branched on audit
+`status`.
+
+**Why:** The two screens have genuinely different jobs — the review screen mutates (gate +
+Complete) a draft; the detail screen is an immutable, full-record view of a signed audit.
+Folding both into one component branched on `status` produces a multi-mode component whose
+every control needs a "which mode am I in" guard — exactly the kind of state-heavy screen
+that rots. Two single-responsibility screens are easier to read and change. This does sit
+in tension with CLAUDE.md's "no extra screens"; the tension is deliberate and the
+maintainability win justifies it here.
+
+**Alternatives considered:**
+- **Reuse the review screen, branch on `status`** — rejected: multi-mode component; dead
+  controls (Complete/gate/signature) hidden by conditionals; the read path and the
+  mutate+sign path drift within one file.
+- **Extract a shared `Count` (and item-row) presentational component now** — deferred. The
+  duplication is a ~10-line stateless block across three screens; extracting it is a
+  separate cleanup, not part of shipping the detail screen (YAGNI + one-bullet discipline).
