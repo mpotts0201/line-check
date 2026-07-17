@@ -56,14 +56,14 @@ Workflow rules (for me and for Claude Code):
 - [x] AC: counts match the review screen for the same audit; query is a single aggregate, verified in the repository function.
 - Files: `app/history.tsx`, `src/db/audits.ts` (new `getCompletedAudits`), `app/audit/review/[auditId].tsx` (post-complete nav → `/history`), `app/_layout.tsx` (History header button). Depends: T5.
 
-### T6.5 — Read-only audit detail (tap a History row)
-Close the vertical slice: a completed audit in History should be openable to see what was signed off. Reuse the review screen in a read-only mode keyed on `status`, rather than adding a new screen (per CLAUDE.md's "no extra screens").
-- [ ] Make `app/history.tsx` rows tappable → `router.push('/audit/review/${audit.id}')`.
-- [ ] Review screen read-only mode: load the audit's `status` (new `getAudit(db, id)` in `src/db/audits.ts`); when `'complete'`, hide the Complete button, the gate hint, and the signature-capture placeholder (show a static "Completed <date>" instead).
-- [ ] In read-only mode, list ALL items with result + temp + note (not just failures), so the row is a full record. Draft review flow (reached from the checklist) is unchanged: counts + failed-items summary + Complete.
-- [ ] Decision (DECISIONS.md): the review screen does double duty (pre-sign summary + post-sign read-only detail), branched on audit status — no new screen.
-- AC: tapping a completed History row shows every item's result/temp/note with no Complete button; counts match the History row and the pre-completion review; the draft review flow is untouched.
-- Files: `app/history.tsx`, `app/audit/review/[auditId].tsx`, `src/db/audits.ts` (new `getAudit`), DECISIONS.md. Depends: T6.
+### T6.5 — Read-only audit detail screen (tap a History row)
+Close the vertical slice: a completed audit in History opens a **dedicated read-only detail screen** showing the full signed record. A separate screen (NOT a status-branch on the review screen) keeps each screen single-responsibility — review = draft→sign, detail = immutable record. History is promoted to a route directory to host both the list and the detail route.
+- [ ] Restructure + stub: move `app/history.tsx` → `app/history/index.tsx` (route `/history` unchanged); add stubbed route `app/history/[auditId].tsx` (read `auditId` param, render it in a `<Text>`). In `app/_layout.tsx`: rename `name="history"` → `name="history/index"`, add `<Stack.Screen name="history/[auditId]" title="Audit Detail">`. Make index rows tappable → `router.push('/history/${audit.id}')`. New typed route → Metro regenerates router types (human recompiles; do not hand-edit router.d.ts).
+- [ ] `getAudit(db, id)` in `src/db/audits.ts` — single audit row + location name (JOIN locations); returns id, status, completedAt, locationName. Detail header needs date + location.
+- [ ] Build `app/history/[auditId].tsx`: load audit via `getAudit` + items via `getAuditItems`; header = location + "Completed <date>"; counts (pass/fail/na) matching the History row; list ALL items with result + temp + note (full record). No Complete button, no signature capture, no completion gate — read-only.
+- [ ] Decision (DECISIONS.md): read-only audit detail is a **separate screen** under `app/history/`, superseding the reuse-the-review-screen approach originally sketched in this ticket. Why: avoid a multi-mode component; single-responsibility screens.
+- AC: tapping a completed History row opens the detail screen showing every item's result/temp/note with no Complete button; counts match the History row and the pre-completion review; the draft review flow (`audit/review/[auditId]`) is untouched.
+- Files: `app/history/index.tsx` (moved), `app/history/[auditId].tsx` (new), `app/_layout.tsx`, `src/db/audits.ts` (new `getAudit`), DECISIONS.md. Depends: T6.
 
 ### T7 — Sync engine (crown jewel — split, do not merge tickets)
 **After 7b lands: one extra session where Claude Code walks me through the flush loop line by line — queue draining, idempotency, backoff, and what happens on a mid-flush crash. This is the piece I'll be asked about.**
