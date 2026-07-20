@@ -97,6 +97,45 @@ maintainability win justifies it here.
 
 ---
 
+## 2026-07-20 — sync_queue: full-row snapshot payload, enqueue at completion only
+
+**Decision:** T7a adds the `sync_queue` table and starts feeding it. Three choices:
+1. **Payload is a full-row JSON snapshot.** Each queue row stores `JSON.stringify` of the
+   local row (`SELECT *`) captured at completion, in the `payload` column CLAUDE.md already
+   specifies. The 7c flush worker deserializes and upserts it — it never re-reads the main
+   tables.
+2. **Only `completeAudit` enqueues.** `getOrCreateTodaysAudit` and `updateAuditItem` are
+   untouched; draft edits stay local. LineCheck syncs a *finished* audit as a unit.
+3. **Enqueue lives in a new `src/db/syncQueue.ts` repository module** (`enqueue(db, row)`),
+   called from `completeAudit` inside its transaction — the UPDATE and the queue inserts
+   commit atomically.
+
+**Why:**
+- **Snapshot** is safe here because a completed audit and its items are immutable — the
+  snapshot is final, so there's no staleness risk that a re-read would fix. It keeps the
+  queue self-contained: each row is a complete, frozen instruction, which makes 7c's
+  crash-recovery/idempotency story easier to reason about and to unit-test (the worker is
+  stateless w.r.t. the audits/audit_items tables).
+- **Completion-only** matches the app's model — a half-filled draft is not a record worth
+  syncing, and the T5 gate already guarantees a completed audit is fully answered. Fewer
+  queue rows, no churn on every keystroke.
+- **Repository module** keeps all sync_queue SQL in one place (the existing repository-layer
+  pattern; screens/functions never inline sync SQL). 7c reuses it for delete-on-confirm.
+- The `status = 'draft'` guard on the UPDATE does double duty: a re-tap changes 0 rows, so
+  the enqueue is skipped — completion and enqueue are idempotent together, no dup queue rows.
+
+**Alternatives considered:**
+- **entityId pointer + re-read at flush** — rejected. Leaves the documented `payload` column
+  unused and couples the worker to re-reading the main tables at flush time, for a freshness
+  benefit that doesn't exist here (the rows are frozen once complete).
+- **Enqueue on every mutation** (per CLAUDE.md's "every mutation appends a sync_queue row")
+  — rejected for this slice: syncs half-filled drafts and multiplies queue churn for no demo
+  value. Revisit only if per-edit sync becomes a requirement.
+- **Inline the sync_queue SQL in `completeAudit`** — rejected: scatters queue read/write SQL
+  (7c's dequeue would then live apart from the enqueue), against the repository-layer split.
+
+---
+
 ## 2026-07-20 — Testing strategy: jest-expo, sync + validation, no UI tests
 
 **Decision:** Add an automated test suite (`jest-expo` preset). Scope is deliberately narrow:

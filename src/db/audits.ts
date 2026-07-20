@@ -1,5 +1,6 @@
 import * as Crypto from "expo-crypto";
 import { type SQLiteBindValue, type SQLiteDatabase } from "expo-sqlite";
+import { enqueue } from "./syncQueue";
 
 export type AuditItem = {
   id: string;
@@ -126,18 +127,40 @@ export async function updateAuditItem(
   );
 }
 
-// Marks a draft audit complete. Stamps completedAt; leaves signatureUri (a placeholder
-// in T5) and syncStatus (T7 owns it) untouched. Guarded on status = 'draft' so a re-tap
-// is idempotent and a completed audit can't be re-completed. Uses 'complete' (not
-// 'completed') per the CLAUDE.md status model. No sync_queue enqueue here — that is T7a.
+// Marks a draft audit complete and enqueues it for sync — the UPDATE and the queue
+// inserts commit together in one transaction (T7a). Stamps completedAt; leaves
+// signatureUri (a placeholder in T5) untouched. Uses 'complete' (not 'completed') per
+// the CLAUDE.md status model. LineCheck syncs a *finished* audit as a unit, so only
+// completion enqueues — draft edits stay local (see DECISIONS.md).
+//
+// The status = 'draft' guard does double duty: a re-tap on an already-complete (or
+// missing) audit changes 0 rows, so we enqueue nothing — the guard makes both the
+// completion and the enqueue idempotent, with no duplicate queue rows.
 export async function completeAudit(
   db: SQLiteDatabase,
   auditId: string
 ): Promise<void> {
-  await db.runAsync(
-    `UPDATE audits SET status = 'complete', completedAt = ? WHERE id = ? AND status = 'draft'`,
-    new Date().toISOString(), auditId
-  );
+  await db.withTransactionAsync(async () => {
+    const res = await db.runAsync(
+      `UPDATE audits SET status = 'complete', completedAt = ? WHERE id = ? AND status = 'draft'`,
+      new Date().toISOString(), auditId
+    );
+    if (res.changes === 0) return; // not a fresh completion → nothing to enqueue
+
+    // Snapshot the now-completed audit + every item into the queue. SELECT * captures
+    // the full local row as the payload; mapping local→remote columns is 7c's job.
+    const audit = await db.getFirstAsync<Record<string, unknown>>(
+      `SELECT * FROM audits WHERE id = ?`, auditId
+    );
+    await enqueue(db, { entity: "audits", entityId: auditId, operation: "upsert", payload: audit });
+
+    const items = await db.getAllAsync<{ id: string }>(
+      `SELECT * FROM audit_items WHERE auditId = ?`, auditId
+    );
+    for (const item of items) {
+      await enqueue(db, { entity: "audit_items", entityId: item.id, operation: "upsert", payload: item });
+    }
+  });
 }
 
 export type Audit = {

@@ -40,5 +40,15 @@ export async function migrate(db: SQLiteDatabase) {
       photoUri TEXT,
       updatedAt TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS sync_queue (
+      id TEXT PRIMARY KEY,
+      entity TEXT NOT NULL,        -- 'audits' | 'audit_items' (the Supabase table name)
+      entityId TEXT NOT NULL,      -- the row's id, for dedupe/debugging
+      operation TEXT NOT NULL,     -- 'upsert' for now
+      payload TEXT NOT NULL,       -- JSON snapshot of the row
+      createdAt TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0   -- 7e backoff counter
+    );
   `);
 }
