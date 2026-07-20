@@ -1,6 +1,11 @@
 import { type SqlDb } from "../db/types";
-import { deleteSyncQueueRows, getPendingSyncQueue } from "../db/syncQueue";
+import {
+  deleteSyncQueueRows,
+  getPendingSyncQueue,
+  incrementSyncQueueAttempts,
+} from "../db/syncQueue";
 import { markAuditsSynced } from "../db/audits";
+import { MAX_ATTEMPTS } from "./retry";
 
 // The narrow slice of the Supabase client the worker needs — its DI seam. Typed with
 // PromiseLike so BOTH the real (thenable) Postgrest builder and a Promise-returning test fake
@@ -18,7 +23,7 @@ export interface SyncClient {
 export type FlushResult =
   | { status: "empty" }
   | { status: "synced"; audits: number; items: number }
-  | { status: "error"; error: unknown };
+  | { status: "error"; error: unknown; attempts: number };
 
 // camelCase local payload → snake_case remote row (the remote convention, matching the
 // existing locations/checklist_templates tables). Also drops the local-only `syncStatus`;
@@ -55,11 +60,15 @@ function toRemoteItem(p: any): Record<string, unknown> {
 // a mid-flush crash merges rather than duplicating.
 export async function flushSyncQueue(db: SqlDb, client: SyncClient): Promise<FlushResult> {
   const pending = await getPendingSyncQueue(db);
-  if (pending.length === 0) return { status: "empty" };
+  // Skip rows that have given up (attempts hit the threshold) — auto-sync stops retrying them
+  // until 8b's per-audit manual retry resets attempts.
+  const eligible = pending.filter((r) => r.attempts < MAX_ATTEMPTS);
+  if (eligible.length === 0) return { status: "empty" };
 
-  const auditRows = pending.filter((r) => r.entity === "audits");
-  const itemRows = pending.filter((r) => r.entity === "audit_items");
+  const auditRows = eligible.filter((r) => r.entity === "audits");
+  const itemRows = eligible.filter((r) => r.entity === "audit_items");
 
+  let failed: unknown | null = null;
   try {
     if (auditRows.length > 0) {
       const { error } = await client
@@ -67,25 +76,36 @@ export async function flushSyncQueue(db: SqlDb, client: SyncClient): Promise<Flu
         .upsert(auditRows.map((r) => toRemoteAudit(JSON.parse(r.payload))), {
           onConflict: "id",
         });
-      if (error) return { status: "error", error };
+      if (error) failed = error;
     }
-    if (itemRows.length > 0) {
+    if (failed === null && itemRows.length > 0) {
       const { error } = await client
         .from("audit_items")
         .upsert(itemRows.map((r) => toRemoteItem(JSON.parse(r.payload))), {
           onConflict: "id",
         });
-      if (error) return { status: "error", error };
+      if (error) failed = error;
     }
   } catch (error) {
-    // Network throw (or a fake that throws mid-flush): nothing has been drained yet, so the
-    // queue is left intact for the next flush.
-    return { status: "error", error };
+    // Network throw (or a fake that throws mid-flush): nothing has been drained yet.
+    failed = error ?? new Error("flush failed");
+  }
+
+  if (failed !== null) {
+    // Leave the whole batch queued (all-or-nothing) and bump attempts so the backoff clock
+    // advances and stuck rows eventually give up. The freshest eligible row's new count drives
+    // the retry cadence (for a single audit that's just its attempts).
+    await incrementSyncQueueAttempts(db, eligible.map((r) => r.id));
+    return {
+      status: "error",
+      error: failed,
+      attempts: Math.min(...eligible.map((r) => r.attempts)) + 1,
+    };
   }
 
   // Confirmed pushed → drain the flushed rows and flip syncStatus in one local transaction.
   await db.withTransactionAsync(async () => {
-    await deleteSyncQueueRows(db, pending.map((r) => r.id));
+    await deleteSyncQueueRows(db, eligible.map((r) => r.id));
     await markAuditsSynced(db, auditRows.map((r) => r.entityId));
   });
 

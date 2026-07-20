@@ -8,21 +8,38 @@ import { provision } from "../src/db/provision";
 import { supabase } from "../src/supabase";
 import { createAutoSync } from "../src/sync/autoSync";
 import { flushSyncQueue } from "../src/sync/flush";
+import { createSyncScheduler } from "../src/sync/retry";
 
-// Renders nothing — it just wires the NetInfo auto-trigger (7d). Lives inside SQLiteProvider so
-// it can read the db handle; injects the real `supabase` singleton so the worker stays
-// singleton-free. The subscribe callback maps NetInfoState → a plain boolean (isConnected is
-// boolean|null; only a definite, reachable connection counts as online).
+// Renders nothing — it wires the sync engine's live triggers (7d/7e). Lives inside
+// SQLiteProvider so it can read the db handle; injects the real `supabase` singleton so the
+// worker stays singleton-free. The scheduler owns the in-flight guard + exponential-backoff
+// retries (setTimeout, tracked so pending retries are cancelled on unmount); createAutoSync
+// feeds it connectivity-regained edges (isConnected is boolean|null — only a definite,
+// reachable connection counts as online).
 function AutoSync() {
   const db = useSQLiteContext();
   useEffect(() => {
-    const auto = createAutoSync({ flush: () => flushSyncQueue(db, supabase) });
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    const scheduler = createSyncScheduler({
+      flush: () => flushSyncQueue(db, supabase),
+      schedule: (fn, delayMs) => {
+        const id = setTimeout(() => {
+          timers.delete(id);
+          fn();
+        }, delayMs);
+        timers.add(id);
+      },
+    });
+    const auto = createAutoSync({ flush: () => scheduler.trigger() });
     const unsubscribe = NetInfo.addEventListener((state) => {
       void auto.onConnectivityChange(
         state.isConnected === true && state.isInternetReachable !== false
       );
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      timers.forEach(clearTimeout); // cancel pending backoff retries on unmount
+    };
   }, [db]);
   return null;
 }

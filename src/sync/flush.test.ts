@@ -87,6 +87,9 @@ const queueCount = (db: SqlDb) =>
 const syncStatus = (db: SqlDb) =>
   db.getFirstAsync<{ syncStatus: string }>("SELECT syncStatus FROM audits WHERE id = 'aud-1'")
     .then((r) => r?.syncStatus);
+// Max attempts across all queue rows (they climb together, all-or-nothing).
+const maxAttempts = (db: SqlDb) =>
+  db.getFirstAsync<{ n: number }>("SELECT MAX(attempts) AS n FROM sync_queue").then((r) => r?.n);
 
 describe("flushSyncQueue", () => {
   it("pushes queued rows, then drains the queue and flips syncStatus", async () => {
@@ -172,6 +175,56 @@ describe("flushSyncQueue", () => {
 
     expect(await flushSyncQueue(db, fake.client)).toEqual({ status: "empty" });
     expect(fake.callOrder).toEqual([]);
+    db.close();
+  });
+
+  // ---- T7e: retry / backoff / give-up ----
+
+  it("increments attempts and keeps rows queued on failure", async () => {
+    const db = createTestDb();
+    await seed(db);
+    const fake = createFakeSupabase({ throwOn: { table: "audits", times: 1 } });
+
+    const result = await flushSyncQueue(db, fake.client);
+
+    expect(result).toEqual({ status: "error", error: expect.anything(), attempts: 1 });
+    expect(await queueCount(db)).toBe(3); // nothing deleted
+    expect(await maxAttempts(db)).toBe(1); // every row bumped 0 → 1
+    expect(await syncStatus(db)).toBe("pending"); // not flipped
+    db.close();
+  });
+
+  it("gives up after MAX_ATTEMPTS and stops retrying those rows", async () => {
+    const db = createTestDb();
+    await seed(db);
+    const fake = createFakeSupabase({ throwOn: { table: "audits", times: 99 } }); // always fails
+
+    for (let i = 1; i <= 3; i++) {
+      const result = await flushSyncQueue(db, fake.client);
+      expect(result).toMatchObject({ status: "error", attempts: i });
+    }
+    expect(await maxAttempts(db)).toBe(3);
+
+    const callsBefore = fake.callOrder.length;
+    const fourth = await flushSyncQueue(db, fake.client);
+    expect(fourth).toEqual({ status: "empty" }); // given-up rows are skipped
+    expect(fake.callOrder.length).toBe(callsBefore); // no upsert attempted
+    expect(await queueCount(db)).toBe(3); // still queued, awaiting a manual retry (8b)
+    db.close();
+  });
+
+  it("drains once the server recovers after earlier failures", async () => {
+    const db = createTestDb();
+    await seed(db);
+    const fake = createFakeSupabase({ throwOn: { table: "audits", times: 2 } }); // fail twice
+
+    await flushSyncQueue(db, fake.client); // attempts → 1
+    await flushSyncQueue(db, fake.client); // attempts → 2
+    const recovered = await flushSyncQueue(db, fake.client); // succeeds
+
+    expect(recovered).toEqual({ status: "synced", audits: 1, items: 2 });
+    expect(await queueCount(db)).toBe(0);
+    expect(await syncStatus(db)).toBe("synced");
     db.close();
   });
 });

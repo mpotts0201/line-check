@@ -278,3 +278,46 @@ returns, via a pure controller `createAutoSync({ flush })` (`src/sync/autoSync.t
   (rewires the 7c button), unnecessary given worker idempotency + the give-up-fallback model.
 - **Build the give-up fallback button now** — rejected: it needs 7e's `attempts`/give-up state,
   which doesn't exist yet; forcing it into 7d would smear two bullets together.
+
+---
+
+## 2026-07-20 — Retry/backoff: per-row attempts, give-up at 3, injected-timer scheduler
+
+**Decision:** T7e adds the flush failure path — the last piece of the sync engine.
+1. **Give-up threshold = 3** (revises the tentative "7" in the 7d entry). Eligible-to-flush =
+   `sync_queue` rows with `attempts < 3`; the worker skips the rest, so auto-sync stops retrying
+   a stuck audit. The user's reasoning: because the backoff delay doubles each try, 3 attempts
+   already spans a sensible window.
+2. **Per-row `attempts`, persisted.** On any flush failure the worker bumps `attempts` for every
+   row in the batch (all-or-nothing preserved — nothing is deleted on failure). Because it lives
+   in `sync_queue`, backoff progress + give-up survive an app restart.
+3. **Exponential `backoffDelay(attempts)`** (`src/sync/retry.ts`): base 2s × 2^(attempts−1),
+   capped at 30s. Pure and unit-tested. The **freshest eligible row's** new count drives the
+   cadence (`min(attempts)+1`); for the common single-audit case that's just its attempts.
+4. **`createSyncScheduler({ flush, schedule })`** — one flush entry point with an in-flight guard
+   that self-reschedules on failure (under the limit) via an **injected** `schedule`. Production
+   passes a `setTimeout` wrapper (timers tracked + cleared on unmount); tests pass a controllable
+   fake, so the retry loop is verified without real timers. The 7d `createAutoSync` feeds its
+   connectivity edges into `scheduler.trigger`.
+5. **Engine-only; per-audit fallback deferred to 8b.** The global "Sync now" button is untouched
+   in 7e (and, like auto-sync, skips given-up rows). The per-audit "Retry sync" that surfaces a
+   stuck audit and resets `attempts` lands in 8b, alongside the per-audit sync-state badge it
+   needs.
+
+**Why:**
+- **attempts as one counter for two jobs** (backoff clock + give-up bound) keeps the state
+  minimal and durable; a stuck audit converges to a bounded, persisted state rather than
+  retrying forever.
+- **Injected schedule** mirrors the DI seam used everywhere in the sync engine: the decision
+  logic (when/how long to retry, when to give up, overlap guard) is pure and tested; only the
+  `setTimeout` glue is untested, and it lives at the app root like the NetInfo wiring.
+- **Engine-only split:** the fallback button fundamentally needs per-audit sync-state surfacing,
+  which is 8b's job — building it in 7e would duplicate that work and smear two bullets.
+
+**Alternatives considered:**
+- **A separate in-memory backoff counter (not per-row attempts)** — rejected: wouldn't survive a
+  restart and would need reconciling with the persisted give-up count; one column does both.
+- **Timer owned inside the scheduler (real `setTimeout`)** — rejected: untestable without fake
+  timers; injecting `schedule` keeps the loop deterministic in tests.
+- **Backoff off the max (or a global) attempts instead of the freshest row** — rejected: the
+  freshest failing row deserves the shortest wait; max would over-delay newly-queued work.

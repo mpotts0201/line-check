@@ -54,3 +54,15 @@ export async function deleteSyncQueueRows(db: SqlDb, ids: string[]): Promise<voi
   const placeholders = ids.map(() => "?").join(", ");
   await db.runAsync(`DELETE FROM sync_queue WHERE id IN (${placeholders})`, ...ids);
 }
+
+// Bumps attempts for the given rows after a failed flush (T7e). attempts is the backoff clock
+// AND the give-up counter: the worker excludes rows at the give-up threshold from future
+// flushes. Rows are never deleted on failure — only their attempts climb.
+export async function incrementSyncQueueAttempts(db: SqlDb, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const placeholders = ids.map(() => "?").join(", ");
+  await db.runAsync(
+    `UPDATE sync_queue SET attempts = attempts + 1 WHERE id IN (${placeholders})`,
+    ...ids
+  );
+}
