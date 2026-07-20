@@ -94,3 +94,42 @@ maintainability win justifies it here.
 - **Extract a shared `Count` (and item-row) presentational component now** — deferred. The
   duplication is a ~10-line stateless block across three screens; extracting it is a
   separate cleanup, not part of shipping the detail screen (YAGNI + one-bullet discipline).
+
+---
+
+## 2026-07-20 — Testing strategy: jest-expo, sync + validation, no UI tests
+
+**Decision:** Add an automated test suite (`jest-expo` preset). Scope is deliberately narrow:
+the **sync engine** (`src/sync/`) and the **validation layer** (`src/validation/audit.ts`).
+Repository tests (`src/db/`) are cheap follow-ons on the same seam, added if time allows.
+**No component/screen/UI tests.** Two seams make this possible without a device:
+- **DB seam** — the repository/sync code depends on a small TS *interface* of the db methods
+  used (`runAsync`, `getAllAsync`, `getFirstAsync`, `withTransactionAsync`, `execAsync`).
+  Production injects expo-sqlite; tests inject an in-memory `better-sqlite3` adapter, so tests
+  exercise **real SQL** against a throwaway DB (never the device, never Supabase).
+- **DI seam** — the sync worker receives `db` and the Supabase client as parameters (never
+  imports the `supabase` singleton the way `provision.ts` does), so tests inject a scripted
+  fake client (success / network error / die-mid-flush). Mirrors the existing repository
+  pattern where every function already takes `db`.
+CI (T8) runs `tsc --noEmit` + `jest` on GitHub's Linux runners — also sidesteps the
+Windows/WSL rule that Claude can't run local commands.
+
+**Why:** Test where correctness risk actually lives. The offline sync engine has properties
+that are effectively impossible to hand-verify reliably — idempotency, FK-ordered upserts,
+delete-on-confirm, crash recovery (kill mid-flush → no duplicates), exponential backoff — and
+those same properties are the senior-level story this project exists to tell. Validation is
+pure and near-free to cover. A crash-recovery unit test is both better engineering and a
+stronger portfolio signal than any coverage percentage. UI tests are excluded on purpose:
+in this author's experience they are brittle and low-ROI, and *real* UI verification belongs
+in a browser/device-rendering E2E harness (Puppeteer / Cypress / Playwright), not Jest —
+which this POC does not need. Manual airplane-mode checks remain the demo, not the safety net.
+
+**Alternatives considered:**
+- **Vitest** — faster and modern, but `jest-expo` handles Expo/RN module transforms out of the
+  box and is what a reviewer expects in an Expo SDK 54 repo. Rejected for lower ecosystem fit.
+- **Fake in-memory db object** (hand-rolled) — rejected: validates logic but never runs the
+  actual SQL, so a broken JOIN/aggregate passes tests and only breaks on-device. The
+  better-sqlite3 adapter runs the real queries for a one-dependency cost.
+- **Mock `expo-sqlite` directly** — rejected: brittle, couples tests to native-module shape.
+- **Full test pyramid incl. screen/component tests** — rejected per the UI-testing stance
+  above; reads as junior (testing the easy surface) rather than the risky core.
