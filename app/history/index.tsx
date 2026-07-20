@@ -27,8 +27,9 @@ export default function History() {
     }, [db])
   );
 
-  // Manual flush (no NetInfo listener yet — that's 7d). This screen is the composition root:
-  // it injects the real `supabase` singleton, so the worker itself stays singleton-free.
+  // Manual flush trigger. Auto-sync on connectivity return is now wired at the app root (7d);
+  // this stays as a manual control for now and becomes a per-audit give-up fallback in 7e. This
+  // screen injects the real `supabase` singleton, so the worker itself stays singleton-free.
   async function onSyncNow() {
     setSyncing(true);
     const result = await flushSyncQueue(db, supabase);

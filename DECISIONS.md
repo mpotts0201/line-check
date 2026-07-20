@@ -236,3 +236,45 @@ Concrete choices:
   items succeed) — rejected: more bookkeeping, no benefit; all-or-nothing re-runs cleanly.
 - **Re-reading rows at flush instead of the snapshot payload** — already rejected in 7a; the
   worker deserializes the queue payload and never touches the main tables to build the upsert.
+
+---
+
+## 2026-07-20 — Auto-sync: edge-triggered NetInfo flush; manual button → 7e give-up fallback
+
+**Decision:** T7d wires a NetInfo listener that auto-runs the flush worker when connectivity
+returns, via a pure controller `createAutoSync({ flush })` (`src/sync/autoSync.ts`).
+1. **Edge-triggered + in-flight guard.** Flush only on a `false → true` connectivity edge,
+   never on a steady 'connected' event; a re-entrant trigger while a flush runs is dropped.
+   Initial state is 'disconnected', so the first confirmed connection (incl. the event NetInfo
+   emits on subscribe) drains a queue left from a prior offline session.
+2. **Pure injectable controller.** It takes only a `flush` thunk — imports neither NetInfo nor
+   `supabase` — so it's unit-tested with a fake flush; the app root (`app/_layout.tsx`,
+   `<AutoSync/>` inside `SQLiteProvider`) is the only place NetInfo + the singleton are wired.
+3. **Standalone guard, no shared coordinator.** The 7c manual button keeps its own flag rather
+   than sharing a mutex with the listener.
+4. **Manual button becomes a give-up fallback in 7e** (not this bullet). It stays an always-on
+   control during 7d; in 7e it converts to a **per-audit** "Retry sync" shown only when an audit
+   is stuck (`attempts >= 7`, unsynced).
+
+**Why:**
+- **Edge + guard:** "sync when connectivity returns" is a transition, not a level; flushing on
+  every 'connected' event would spam. The guard makes overlapping/rapid triggers a no-op —
+  exactly the AC.
+- **Pure controller:** keeps NetInfo (a native module) out of the test graph entirely — no mock
+  needed — and mirrors the worker's DI seam.
+- **Standalone guard is safe:** the worker is idempotent (upsert-by-id + delete-on-confirm), so
+  a rare manual+auto overlap can't duplicate; and once the button is a give-up fallback it only
+  appears after auto-sync has stopped retrying, so overlap effectively can't happen. A shared
+  coordinator would be extra coupling (rewiring the shipped button) for no real gain.
+- **Give-up = 7:** bounds retries so a permanently-failing audit stops burning battery/network
+  and instead surfaces a manual escape hatch. The threshold + per-audit surfacing belong with
+  7e's `attempts` machinery and 8b's badge, so building the fallback there (not in 7d) keeps
+  each bullet coherent.
+
+**Alternatives considered:**
+- **Flush on every 'connected' event (no edge)** — rejected: redundant flushes on every
+  NetInfo emit.
+- **Shared flush coordinator (single mutex for manual + auto)** — rejected for 7d: more scope
+  (rewires the 7c button), unnecessary given worker idempotency + the give-up-fallback model.
+- **Build the give-up fallback button now** — rejected: it needs 7e's `attempts`/give-up state,
+  which doesn't exist yet; forcing it into 7d would smear two bullets together.
