@@ -195,3 +195,44 @@ build choices:
 - **Adapter under `src/db/`** — rejected: risks bundling a native-only dependency into the app.
 - **No babel.config.js** (rely on jest-expo's internal preset) — viable and needs no Metro restart, but rejected for the explicit/conventional setup; the one-time restart cost is trivial in this solo workflow.
 - **Inline babel in jest's `transform` with `configFile:false`** — rejected: more moving parts than the canonical file for no benefit here.
+
+---
+
+## 2026-07-20 — Flush worker: snake_case mapping, all-or-nothing flush, idempotent upsert
+
+**Decision:** T7c's `flushSyncQueue` (`src/sync/flush.ts`) drains `sync_queue` to Supabase.
+Concrete choices:
+1. **Remote is snake_case; the worker maps camelCase → snake_case per entity** (`toRemoteAudit`
+   / `toRemoteItem`). The mapper also drops the local-only `syncStatus` and omits `photoUri`
+   (deferred to 8a's Storage upload).
+2. **All-or-nothing per flush.** Read all pending → upsert audits (awaited to completion) →
+   upsert audit_items → then, only on confirmed success, delete the flushed queue rows and flip
+   `audits.syncStatus` → `synced`, in one local transaction. Any returned error or thrown
+   network failure returns `{ status: 'error' }` early, leaving the queue fully intact.
+3. **Idempotency via `upsert(rows, { onConflict: 'id' })` + delete-on-confirm.** A drained queue
+   re-runs to a no-op; a mid-flush crash re-upserts the same ids (merge, never duplicate).
+4. **The worker is singleton-free** — it takes `db: SqlDb` and a narrow `SyncClient` param
+   (`PromiseLike`-typed so the real thenable Postgrest builder and a Promise fake both fit).
+   The History screen is the composition root that injects the real `supabase` singleton.
+
+**Why:**
+- **snake_case + explicit mapper:** matches the existing remote `locations`/`checklist_templates`
+  convention (idiomatic Postgres) and makes the local↔remote boundary an explicit, testable
+  layer rather than leaking camelCase column names into the database.
+- **All-or-nothing:** the simplest correct model. Partial deletes would need per-entity success
+  tracking for no real gain here; leaving the whole batch queued on any failure is trivially
+  safe to retry and is exactly what 7e's backoff will build on.
+- **onConflict id + delete-on-confirm:** together they give idempotency and crash recovery for
+  free — the two properties the unit tests (in-memory better-sqlite3 + a fake Supabase that
+  models upsert-by-id) actually assert.
+- **Singleton-free worker:** the whole point of the 7b DI seam; the fake client is injectable
+  only because the worker never imports `supabase` (unlike `provision.ts`).
+
+**Alternatives considered:**
+- **camelCase remote columns (upsert payload verbatim, no rename)** — rejected: unidiomatic
+  quoted Postgres identifiers, inconsistent with the existing snake_case tables; the mapper is
+  cheap and doubles as the place local-only columns are dropped.
+- **Per-entity partial delete** (delete audit queue rows after audits succeed, item rows after
+  items succeed) — rejected: more bookkeeping, no benefit; all-or-nothing re-runs cleanly.
+- **Re-reading rows at flush instead of the snapshot payload** — already rejected in 7a; the
+  worker deserializes the queue payload and never touches the main tables to build the upsert.

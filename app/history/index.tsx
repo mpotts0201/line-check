@@ -3,6 +3,8 @@ import { useSQLiteContext } from "expo-sqlite";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { getCompletedAudits, type AuditSummary } from "../../src/db/audits";
+import { supabase } from "../../src/supabase";
+import { flushSyncQueue } from "../../src/sync/flush";
 
 // completedAt is an ISO string; show its date portion. Kept manual (no date lib, no
 // reliance on Hermes Intl) so it renders identically on every device.
@@ -14,6 +16,8 @@ export default function History() {
   const db = useSQLiteContext();
   const router = useRouter();
   const [audits, setAudits] = useState<AuditSummary[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
   // Refetch on focus — a just-completed audit (arriving via replace('/history')) is
   // present, and later completions refresh when this screen regains focus.
@@ -23,11 +27,43 @@ export default function History() {
     }, [db])
   );
 
+  // Manual flush (no NetInfo listener yet — that's 7d). This screen is the composition root:
+  // it injects the real `supabase` singleton, so the worker itself stays singleton-free.
+  async function onSyncNow() {
+    setSyncing(true);
+    const result = await flushSyncQueue(db, supabase);
+    setSyncStatus(
+      result.status === "synced"
+        ? `Synced ${result.audits} audits · ${result.items} items`
+        : result.status === "empty"
+          ? "Up to date"
+          : "Sync failed — will retry"
+    );
+    getCompletedAudits(db).then(setAudits);
+    setSyncing(false);
+  }
+
   return (
     <FlatList
       data={audits}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.list}
+      ListHeaderComponent={
+        <View style={styles.syncBar}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.syncBtn,
+              syncing && styles.syncBtnDisabled,
+              pressed && styles.pressed,
+            ]}
+            onPress={onSyncNow}
+            disabled={syncing}
+          >
+            <Text style={styles.syncBtnText}>{syncing ? "Syncing…" : "Sync now"}</Text>
+          </Pressable>
+          {syncStatus && <Text style={styles.syncStatus}>{syncStatus}</Text>}
+        </View>
+      }
       ListEmptyComponent={<Text style={styles.empty}>No completed audits yet.</Text>}
       renderItem={({ item }) => (
         <Pressable
@@ -70,6 +106,16 @@ function Count({
 const styles = StyleSheet.create({
   list: { padding: 16, gap: 10 },
   empty: { fontSize: 15, color: "#999", padding: 16 },
+  syncBar: { gap: 6, marginBottom: 4 },
+  syncBtn: {
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  syncBtnDisabled: { backgroundColor: "#999" },
+  syncBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  syncStatus: { fontSize: 13, color: "#666", textAlign: "center" },
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,

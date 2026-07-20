@@ -164,6 +164,18 @@ export async function completeAudit(
   });
 }
 
+// Flips completed audits to synced after their sync_queue rows are confirmed pushed (T7c's
+// delete-on-confirm step). syncStatus is otherwise write-once (schema default 'pending'); this
+// is its only writer. Placeholders come from auditIds.length; the ids ride bound `?` params.
+export async function markAuditsSynced(db: SqlDb, auditIds: string[]): Promise<void> {
+  if (auditIds.length === 0) return;
+  const placeholders = auditIds.map(() => "?").join(", ");
+  await db.runAsync(
+    `UPDATE audits SET syncStatus = 'synced' WHERE id IN (${placeholders})`,
+    ...auditIds
+  );
+}
+
 export type Audit = {
   id: string;
   locationId: string;

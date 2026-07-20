@@ -27,3 +27,30 @@ export async function enqueue(db: SqlDb, row: EnqueueRow): Promise<void> {
     JSON.stringify(row.payload), new Date().toISOString()
   );
 }
+
+// A queued mutation as stored. `payload` is the JSON string enqueue() wrote; the flush
+// worker JSON.parses it back into the local row it snapshotted (T7c).
+export type SyncQueueRow = {
+  id: string;
+  entity: SyncEntity;
+  entityId: string;
+  operation: SyncOperation;
+  payload: string;
+  createdAt: string;
+  attempts: number;
+};
+
+// All pending queue rows, oldest first. FIFO by createdAt is for determinism; FK ordering
+// (audits before audit_items) is enforced by the worker bucketing on `entity`, not this sort.
+export async function getPendingSyncQueue(db: SqlDb): Promise<SyncQueueRow[]> {
+  return db.getAllAsync<SyncQueueRow>(`SELECT * FROM sync_queue ORDER BY createdAt`);
+}
+
+// Deletes the flushed rows by id (delete-on-confirm — the worker calls this only after a
+// confirmed remote upsert). Placeholders are generated from ids.length alone; the id values
+// ride bound `?` params, never string-interpolated, so they can't inject.
+export async function deleteSyncQueueRows(db: SqlDb, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const placeholders = ids.map(() => "?").join(", ");
+  await db.runAsync(`DELETE FROM sync_queue WHERE id IN (${placeholders})`, ...ids);
+}
