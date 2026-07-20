@@ -1,6 +1,6 @@
-import { type SQLiteDatabase } from "expo-sqlite";
+import { type SqlDb } from "./types";
 
-export async function migrate(db: SQLiteDatabase) {
+export async function migrate(db: SqlDb) {
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
 

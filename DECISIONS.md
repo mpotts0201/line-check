@@ -172,3 +172,26 @@ which this POC does not need. Manual airplane-mode checks remain the demo, not t
 - **Mock `expo-sqlite` directly** — rejected: brittle, couples tests to native-module shape.
 - **Full test pyramid incl. screen/component tests** — rejected per the UI-testing stance
   above; reads as junior (testing the easy surface) rather than the risky core.
+
+---
+
+## 2026-07-20 — Test harness build-out: jest-expo, canonical babel.config, SqlDb via Pick
+
+**Decision:** T7b implements the harness the 2026-07-20 testing strategy describes. Concrete
+build choices:
+1. **`SqlDb` is `Pick<SQLiteDatabase, 'runAsync'|'getAllAsync'|'getFirstAsync'|'withTransactionAsync'|'execAsync'>`** (`src/db/types.ts`), and every repository function retypes its `db` param from `SQLiteDatabase` to `SqlDb`. Pure type change — a real `SQLiteDatabase` is assignable to `SqlDb`, so app callers are untouched.
+2. **The in-memory better-sqlite3 adapter lives in `test/`** (not `src/`) so the native-only dependency never enters the app bundle. Its `withTransactionAsync` drives `BEGIN`/`COMMIT`/`ROLLBACK` by hand.
+3. **A canonical `babel.config.js`** (`presets: ['babel-preset-expo']`) is added.
+4. **jest config is just `{ preset: 'jest-expo' }`** — the default env is kept.
+
+**Why:**
+- **Pick over a hand-written interface:** the signatures (overloads + generics) stay auto-synced with expo-sqlite, so the seam can never drift from the real API, and `SQLiteDatabase → SqlDb` is provably a no-op. The adapter is checked against these exact signatures at compile time.
+- **Adapter in `test/`:** better-sqlite3 is a native Node addon that must never ship to the device; keeping it out of `src/` makes that boundary structural. Manual BEGIN/COMMIT is required because better-sqlite3's `.transaction()` helper only wraps *sync* functions, while the seam is async — and real ROLLBACK semantics are exactly what the crash-recovery test needs.
+- **babel.config.js:** not required (jest-expo self-supplies `expo/internal/babel-preset`), but adding the canonical file is the conventional Expo setup and makes babel a single explicit source of truth for Metro + jest. It's behaviorally identical to Metro's prior implicit default — babel-preset-expo auto-injects `react-native-worklets/plugin`, so reanimated is unaffected. Naming the preset by bare name in the config required adding `babel-preset-expo` as a direct dependency — it was previously only nested under `expo`, resolved via the internal path, so bare-name resolution from the project root failed until it was installed top-level.
+- **Default test env kept:** jest-expo's env is already node-based (with the `react-native` export condition + RN setup mocks); better-sqlite3 loads fine under it. Forcing `testEnvironment: 'node'` would break jest-expo's `setup.js`.
+
+**Alternatives considered:**
+- **Hand-written `SqlDb` interface** — rejected: duplicates expo-sqlite's overloaded signatures and drifts.
+- **Adapter under `src/db/`** — rejected: risks bundling a native-only dependency into the app.
+- **No babel.config.js** (rely on jest-expo's internal preset) — viable and needs no Metro restart, but rejected for the explicit/conventional setup; the one-time restart cost is trivial in this solo workflow.
+- **Inline babel in jest's `transform` with `configFile:false`** — rejected: more moving parts than the canonical file for no benefit here.

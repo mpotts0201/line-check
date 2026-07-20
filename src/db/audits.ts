@@ -1,5 +1,6 @@
 import * as Crypto from "expo-crypto";
-import { type SQLiteBindValue, type SQLiteDatabase } from "expo-sqlite";
+import { type SQLiteBindValue } from "expo-sqlite";
+import { type SqlDb } from "./types";
 import { enqueue } from "./syncQueue";
 
 export type AuditItem = {
@@ -25,7 +26,7 @@ export type MutableAuditItemFields = Partial<
 
 // Finds today's draft audit for this location, or instantiates one from templates.
 export async function getOrCreateTodaysAudit(
-  db: SQLiteDatabase,
+  db: SqlDb,
   locationId: string
 ): Promise<string> {
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
@@ -63,7 +64,7 @@ export async function getOrCreateTodaysAudit(
 }
 
 export async function getAuditItems(
-  db: SQLiteDatabase,
+  db: SqlDb,
   auditId: string
 ): Promise<AuditItem[]> {
   return db.getAllAsync<AuditItem>(
@@ -79,7 +80,7 @@ export async function getAuditItems(
 // (which lives on checklist_templates, not audit_items) comes through — the
 // item screen needs it to decide whether to show the temp field.
 export async function getAuditItem(
-  db: SQLiteDatabase,
+  db: SqlDb,
   id: string
 ): Promise<AuditItem | null> {
   return db.getFirstAsync<AuditItem>(
@@ -98,7 +99,7 @@ export async function getAuditItem(
 // `?` params. updatedAt is stamped HERE, never accepted from callers: it is the
 // last-write-wins clock the sync engine compares on, so the repository owns it.
 export async function updateAuditItem(
-  db: SQLiteDatabase,
+  db: SqlDb,
   id: string,
   fields: MutableAuditItemFields
 ): Promise<void> {
@@ -137,7 +138,7 @@ export async function updateAuditItem(
 // missing) audit changes 0 rows, so we enqueue nothing — the guard makes both the
 // completion and the enqueue idempotent, with no duplicate queue rows.
 export async function completeAudit(
-  db: SQLiteDatabase,
+  db: SqlDb,
   auditId: string
 ): Promise<void> {
   await db.withTransactionAsync(async () => {
@@ -178,7 +179,7 @@ export type Audit = {
 // screen) branches on `status`. Counts are NOT here: the screen derives them from
 // getAuditItems in-screen, exactly as the review screen does (no second aggregate).
 export async function getAudit(
-  db: SQLiteDatabase,
+  db: SqlDb,
   id: string
 ): Promise<Audit | null> {
   return db.getFirstAsync<Audit>(
@@ -206,7 +207,7 @@ export type AuditSummary = {
 // No N+1: the counts ride on the same row, never a follow-up query per audit. Unanswered
 // is deliberately not counted — the T5 completion gate guarantees it is 0 here.
 export async function getCompletedAudits(
-  db: SQLiteDatabase
+  db: SqlDb
 ): Promise<AuditSummary[]> {
   return db.getAllAsync<AuditSummary>(
     `SELECT a.id, a.locationId, a.completedAt, l.name AS locationName,

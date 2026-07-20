@@ -1,7 +1,7 @@
-import { type SQLiteDatabase } from "expo-sqlite";
+import { type SqlDb } from "./types";
 import { supabase } from "../supabase";
 
-export async function provision(db: SQLiteDatabase): Promise<boolean> {
+export async function provision(db: SqlDb): Promise<boolean> {
   try {
     const [loc, tpl] = await Promise.all([
       supabase.from("locations").select("*"),
