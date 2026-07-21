@@ -9,6 +9,8 @@ Primary goal: a tight, demo-able vertical slice with senior-level architecture (
 ## Critical environment rules — READ FIRST
 Before proposing architectural changes, read DECISIONS.md. Append new significant decisions there with date and rationale.
 
+Before committing any code, always run the code-reviewer agent and address Critical and Warning findings.
+
 This repo is developed in a **split Windows/WSL2 workflow**:
 
 - **Claude Code runs in WSL2** and accesses this repo via `/mnt/c/Users/mpott/Projects/career/line-check`
@@ -76,3 +78,95 @@ IDs are client-generated UUIDs (so offline creation never blocks on the server).
 - No localStorage/AsyncStorage as a data store — SQLite is the source of truth
 - No premature abstractions or extra screens beyond the list above
 - No SDK upgrades, no ejecting, no `expo prebuild` — flag first, human decides
+
+# Code Review Standards
+
+These standards are enforced by the code-reviewer agent. Findings are reported as
+Critical / Warning / Nit with file:line references. Critical and Warning findings
+must be resolved before commit. The review covers only changed code — do not flag
+pre-existing issues outside the diff unless the change makes them worse.
+
+## Gate 0 — Mechanical checks (non-negotiable)
+
+- `npx tsc --noEmit` passes. No new `any`, no `@ts-ignore`/`@ts-expect-error`
+  without a comment explaining why.
+- `npx eslint .` passes with the project config (eslint-config-expo). Do not
+  hand-review anything the linter already covers.
+
+
+## Architecture & state
+
+- Navigation is expo-router only. Screens live in `app/`; everything else
+  (components, hooks, lib) lives outside it. No manual navigator setup.
+- Server data goes through TanStack Query hooks in `hooks/`. Components never
+  call fetch/axios directly. [Critical]
+- Local UI state stays in the component that owns it. Lift state only when two
+  siblings need it; reach for global state (Zustand/context) only for genuinely
+  app-wide concerns (auth, theme). Flag prop drilling deeper than 2 levels.
+- One component per file. Shared components in `components/`, screen-specific
+  ones co-located with the screen.
+
+## React Native / Expo specifics
+
+- Prefer Expo SDK modules over bare RN or third-party equivalents when one
+  exists (expo-image over Image for remote images, expo-secure-store for
+  tokens, etc.). Flag new native dependencies — they need justification since
+  we want to stay in Expo Go / managed workflow. [Warning]
+- Long or dynamic lists use FlatList/FlashList, never `.map()` inside a
+  ScrollView. [Critical]
+- No anonymous functions or object/array literals passed as props to list
+  items or memoized components — extract with useCallback/useMemo. Elsewhere,
+  do NOT flag missing memoization; premature memo is a Nit at most.
+- Every screen handles safe areas (SafeAreaView or useSafeAreaInsets).
+- Platform-specific behavior uses Platform.select or `.ios.tsx`/`.android.tsx`
+  files, not scattered `Platform.OS === ...` conditionals in render logic.
+- No heavy synchronous work (parsing, image manipulation, large loops) on the
+  JS thread in render or in event handlers users are waiting on.
+
+## Styling
+
+- Styles use StyleSheet.create at the bottom of the file. No inline style
+  objects except a single dynamic value merged with a static style.
+- Colors, spacing, and type sizes come from the theme/constants file — flag
+  hardcoded hex values or magic numbers for spacing. [Warning]
+
+## Errors, async, and security
+
+- No silently swallowed errors: every catch either recovers meaningfully,
+  surfaces user-facing feedback, or rethrows. Empty catch blocks are
+  [Critical].
+- Every async screen has explicit loading and error UI states — not just the
+  happy path.
+- Tokens and secrets go in expo-secure-store, never AsyncStorage, and never
+  hardcoded. Runtime config comes from env/EAS, not committed literals.
+  [Critical]
+- Cleanup: subscriptions, listeners, and timers set up in useEffect are torn
+  down in the cleanup function. [Warning]
+
+## Accessibility & UX baseline
+
+- Touchable elements have accessibilityRole and, where the visible text isn't
+  self-explanatory, an accessibilityLabel.
+- Tap targets are at least 44x44. Interactive elements give pressed feedback
+  (opacity, ripple) — no dead-feeling Pressables.
+
+## Personal conventions
+
+- Named exports only; no default exports outside `app/` routes.
+- Booleans read as predicates: `isLoading`, `hasError`, `canSubmit`.
+- Comments explain *why*, not *what*. Flag commented-out code. [Nit]
+- Files over ~200 lines should prompt a suggestion to split. [Nit]
+
+## What NOT to flag
+
+- Formatting, import order, or anything Prettier/ESLint owns.
+- Style preferences not written in this document.
+- Missing tests (this is a small project; tests are added deliberately, not
+  demanded per-diff).
+- Speculative "you might want to" refactors unrelated to the change.
+
+## Verdict format
+
+End every review with exactly one of:
+- **APPROVED** — no Critical or Warning findings.
+- **CHANGES REQUIRED** — list the blocking findings, each with a concrete fix.
