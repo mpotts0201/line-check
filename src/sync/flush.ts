@@ -28,6 +28,12 @@ export type FlushResult =
 // camelCase local payload → snake_case remote row (the remote convention, matching the
 // existing locations/checklist_templates tables). Also drops the local-only `syncStatus`;
 // `photoUri` is deferred to 8a (Storage upload), so it is not sent here.
+//
+// NOTE the remote names are `signature_path` / `photo_path`, NOT `_uri`. Locally these hold a
+// device `file://` URI; remotely they are meant to hold a Storage object path. Until 8a does
+// the upload, `signatureUri` is a T5 placeholder (null in practice), so passing it straight
+// through is harmless — but 8a must map the POST-UPLOAD path here, not the local URI, which
+// would be meaningless to any other device.
 function toRemoteAudit(p: any): Record<string, unknown> {
   return {
     id: p.id,
@@ -35,7 +41,7 @@ function toRemoteAudit(p: any): Record<string, unknown> {
     status: p.status,
     started_at: p.startedAt,
     completed_at: p.completedAt,
-    signature_uri: p.signatureUri,
+    signature_path: p.signatureUri,
   };
 }
 function toRemoteItem(p: any): Record<string, unknown> {
