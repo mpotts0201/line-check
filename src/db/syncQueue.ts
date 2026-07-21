@@ -66,3 +66,24 @@ export async function incrementSyncQueueAttempts(db: SqlDb, ids: string[]): Prom
     ...ids
   );
 }
+
+// Queue depth, so the UI can distinguish "nothing queued" from "rows queued but all given
+// up" — the worker collapses both into `status: 'empty'`, and reporting the second as "Up to
+// date" would misrepresent whether the user's work is durable.
+//
+// The give-up threshold is a PARAMETER, not an import: `src/db` must not depend on
+// `src/sync` (sync depends on db, and importing MAX_ATTEMPTS here would close a
+// syncQueue → retry → flush → syncQueue loop). The caller passes the same constant the
+// worker filters on, so the count still can't drift.
+export async function getSyncQueueStats(
+  db: SqlDb,
+  maxAttempts: number
+): Promise<{ total: number; givenUp: number }> {
+  const row = await db.getFirstAsync<{ total: number; givenUp: number }>(
+    `SELECT COUNT(*) AS total,
+            COUNT(CASE WHEN attempts >= ? THEN 1 END) AS givenUp
+     FROM sync_queue`,
+    maxAttempts
+  );
+  return row ?? { total: 0, givenUp: 0 };
+}

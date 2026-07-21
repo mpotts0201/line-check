@@ -321,3 +321,57 @@ returns, via a pure controller `createAutoSync({ flush })` (`src/sync/autoSync.t
   timers; injecting `schedule` keeps the loop deterministic in tests.
 - **Backoff off the max (or a global) attempts instead of the freshest row** — rejected: the
   freshest failing row deserves the shortest wait; max would over-delay newly-queued work.
+
+---
+
+## 2026-07-21 — Remote schema checked in; sync errors surfaced (dev-only detail)
+
+**Context:** the first real end-to-end sync failed silently. Every completed audit reported
+"Sync failed — will retry" and nothing reached Supabase. Root cause: `toRemoteAudit` wrote
+`signature_uri`, but the remote column is `signature_path` (likewise `photo_path`, which 8a
+must respect). PostgREST returned `PGRST204`; the `audits` upsert runs before `audit_items`,
+so the batch failed at the first request and the all-or-nothing path correctly re-queued
+everything. The engine behaved exactly as designed — it just had no way to say why.
+
+**Decisions:**
+1. **`supabase/schema.sql` is checked in.** Transcribed from the live project via
+   `information_schema` AFTER the tables were hand-created in the dashboard. It documents the
+   remote contract rather than provisioning it — the dashboard is still the source of truth.
+2. **Flush errors are surfaced, not discarded.** `onSyncNow` previously dropped a fully
+   populated `result.error` for a fixed string. The raw object now always goes to
+   `console.warn`; the decoded Postgrest code renders on-device **only under `__DEV__`**.
+3. **`status: 'empty'` is disambiguated.** It conflated "nothing queued" with "rows queued but
+   all given up"; the latter rendered as "Up to date", which misstated whether the user's work
+   was durable. `getSyncQueueStats` splits them.
+4. **`resetAuditData` (`src/db/dev.ts`) + a `__DEV__`-gated reset button.** Clears audits,
+   audit_items, and sync_queue in one transaction; keeps locations/checklist_templates so a
+   reset works **offline**.
+5. **`getSyncQueueStats` takes the threshold as a parameter.** Importing `MAX_ATTEMPTS` into
+   `src/db` would invert the layering (sync depends on db) and close a
+   `syncQueue → retry → flush → syncQueue` loop.
+
+**Why:**
+- **The unit tests could not have caught this.** `flush.test.ts`'s fake stores rows in a `Map`
+  keyed on `id` and never asserts column names — any shape passes. The DI seam that makes the
+  worker testable also makes it blind to the remote contract. Schema drift needs a schema
+  artifact or an integration test, not more unit tests against a permissive fake. This is the
+  main lesson of the incident and the reason for decision 1.
+- **`__DEV__` splits the audience.** `PGRST204 · Could not find the 'signature_uri' column` is
+  what a developer needs and noise to a manager in a walk-in cooler. Silence was the actual
+  bug; a raw Postgrest code in production would be a different one.
+- **Offline reset (4)** matches the app's premise: dropping the seed tables would make the app
+  unusable until the next successful `provision()` round-trip.
+
+**Alternatives considered:**
+- **Revert the diagnostics once the bug was fixed** — rejected: the original code violated the
+  project's own "no silently swallowed errors" standard. The value isn't this bug, it's the
+  class (RLS changes, FK violations, dropped columns).
+- **Keep resetting `attempts` on every manual "Sync now"** — rejected: it silently defeats the
+  7e give-up threshold, making `MAX_ATTEMPTS` decorative. 8b's per-audit retry is the right
+  home for a deliberate reset.
+- **Generating `schema.sql` as a real migration and applying it** — rejected for now: the
+  tables already exist with data; a migration path is a production-readiness item, not a
+  same-day fix.
+- **Renaming the local column to `signaturePath`** — rejected: local holds a device `file://`
+  URI and remote holds a Storage object path. They are genuinely different things, and 8a must
+  map the post-upload path rather than passing the local URI through.
