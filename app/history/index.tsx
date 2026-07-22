@@ -4,7 +4,11 @@ import { useCallback, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { getCompletedAudits, type AuditSummary } from "../../src/db/audits";
 import { resetAuditData } from "../../src/db/dev";
-import { getSyncQueueStats } from "../../src/db/syncQueue";
+import {
+  getAuditSyncStates,
+  getSyncQueueStats,
+  type AuditSyncStateRow,
+} from "../../src/db/syncQueue";
 import { supabase } from "../../src/supabase";
 import { flushSyncQueue } from "../../src/sync/flush";
 import { MAX_ATTEMPTS } from "../../src/sync/retry";
@@ -42,19 +46,60 @@ function formatSyncError(error: unknown): string {
   return String(error);
 }
 
+// Named here rather than inline so the three states can't drift apart; a shared theme
+// constants file is 8b-iv's problem (stuck reuses the fail-count red already in this file).
+const BADGE_COLOR = {
+  synced: "#2e7d32",
+  stuck: "#c0392b",
+  pending: "#999",
+} as const;
+
+// Badge text + tint for one audit's card. The lookup can miss only if an audit completed
+// between the two queries in refresh(); the fallback reads Pending for the same reason a
+// drained-queue-but-unconfirmed audit does — never claim a confirmation we don't have.
+function syncBadge(state: AuditSyncStateRow | undefined): { label: string; color: string } {
+  if (state?.state === "synced") return { label: "Synced ✓", color: BADGE_COLOR.synced };
+  if (state?.state === "stuck") return { label: "Not synced", color: BADGE_COLOR.stuck };
+  const waiting = state?.pendingRows ?? 0;
+  return {
+    label: waiting > 0 ? `Pending — ${waiting} waiting` : "Pending",
+    color: BADGE_COLOR.pending,
+  };
+}
+
 export default function History() {
   const db = useSQLiteContext();
   const router = useRouter();
   const [audits, setAudits] = useState<AuditSummary[]>([]);
+  const [syncStates, setSyncStates] = useState<Record<string, AuditSyncStateRow>>({});
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+
+  // Summaries and sync states are two queries merged here by audit id — joining sync_queue
+  // into the summaries query would fan out the GROUP BY that builds the pass/fail/na counts
+  // (see getAuditSyncStates). MAX_ATTEMPTS is injected at this layer; src/db never sees it.
+  const refresh = useCallback(async () => {
+    try {
+      const [completed, states] = await Promise.all([
+        getCompletedAudits(db),
+        getAuditSyncStates(db, MAX_ATTEMPTS),
+      ]);
+      setAudits(completed);
+      setSyncStates(Object.fromEntries(states.map((s) => [s.auditId, s])));
+    } catch (error) {
+      // Catch here so every call site (focus, post-sync, post-reset) surfaces the same
+      // way — and so a failed read can't strand onSyncNow or overwrite a reset's outcome.
+      console.warn("[history] load failed", error);
+      setSyncStatus(`Load failed — ${formatSyncError(error)}`);
+    }
+  }, [db]);
 
   // Refetch on focus — a just-completed audit (arriving via replace('/history')) is
   // present, and later completions refresh when this screen regains focus.
   useFocusEffect(
     useCallback(() => {
-      getCompletedAudits(db).then(setAudits);
-    }, [db])
+      refresh();
+    }, [refresh])
   );
 
   // Manual flush trigger. Auto-sync on connectivity return is now wired at the app root (7d);
@@ -62,6 +107,21 @@ export default function History() {
   // screen injects the real `supabase` singleton, so the worker itself stays singleton-free.
   async function onSyncNow() {
     setSyncing(true);
+    try {
+      await runSync();
+    } catch (error) {
+      // flushSyncQueue returns failures and refresh() self-catches, so only a direct DB
+      // throw (e.g. getSyncQueueStats) lands here — surface it rather than reject silently.
+      console.warn("[sync] unexpected failure", error);
+      setSyncStatus(`Sync failed — ${formatSyncError(error)}`);
+    } finally {
+      // Without this, a throw anywhere above leaves syncing=true forever, disabling both
+      // buttons until app restart.
+      setSyncing(false);
+    }
+  }
+
+  async function runSync() {
     const result = await flushSyncQueue(db, supabase);
 
     if (result.status === "synced") {
@@ -95,8 +155,7 @@ export default function History() {
       );
     }
 
-    getCompletedAudits(db).then(setAudits);
-    setSyncing(false);
+    await refresh();
   }
 
   // TEMPORARY (dev/demo) — wipes local audits, items, and the sync queue. Confirmed first:
@@ -114,7 +173,7 @@ export default function History() {
             try {
               await resetAuditData(db);
               setSyncStatus("Local audit data cleared");
-              setAudits(await getCompletedAudits(db));
+              await refresh();
             } catch (error) {
               console.warn("[dev] reset failed", error);
               setSyncStatus(`Reset failed — ${formatSyncError(error)}`);
@@ -170,23 +229,26 @@ export default function History() {
         </View>
       }
       ListEmptyComponent={<Text style={styles.empty}>No completed audits yet.</Text>}
-      renderItem={({ item }) => (
-        <Pressable
-          style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-          onPress={() => router.push(`/history/${item.id}`)}
-        >
-          <View style={styles.headerRow}>
-            <Text style={styles.name}>{item.locationName}</Text>
-            <Text style={styles.date}>{formatDate(item.completedAt)}</Text>
-          </View>
-          <View style={styles.countsRow}>
-            <Count label="Pass" value={item.passCount} />
-            <Count label="Fail" value={item.failCount} tint="#c0392b" />
-            <Count label="N/A" value={item.naCount} />
-          </View>
-          <Text style={styles.sync}>Not synced</Text>
-        </Pressable>
-      )}
+      renderItem={({ item }) => {
+        const badge = syncBadge(syncStates[item.id]);
+        return (
+          <Pressable
+            style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+            onPress={() => router.push(`/history/${item.id}`)}
+          >
+            <View style={styles.headerRow}>
+              <Text style={styles.name}>{item.locationName}</Text>
+              <Text style={styles.date}>{formatDate(item.completedAt)}</Text>
+            </View>
+            <View style={styles.countsRow}>
+              <Count label="Pass" value={item.passCount} />
+              <Count label="Fail" value={item.failCount} tint="#c0392b" />
+              <Count label="N/A" value={item.naCount} />
+            </View>
+            <Text style={[styles.sync, { color: badge.color }]}>{badge.label}</Text>
+          </Pressable>
+        );
+      }}
     />
   );
 }
