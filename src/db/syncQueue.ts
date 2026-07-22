@@ -67,6 +67,75 @@ export async function incrementSyncQueueAttempts(db: SqlDb, ids: string[]): Prom
   );
 }
 
+// Per-audit sync state for the History screen (T8b). Derived HERE, in one place — screens
+// render the label, they never re-derive the trichotomy:
+//   synced  — remote confirmed (syncStatus flipped) and nothing left in the queue
+//   stuck   — queue rows at the give-up threshold; the worker will never retry them,
+//             only a manual per-audit reset (8b-iii) can revive them
+//   pending — everything else, INCLUDING zero queue rows while syncStatus is still
+//             'pending': that means "we never heard back", not "it didn't land", and
+//             showing it as synced would claim a confirmation we don't have
+export type AuditSyncState = "synced" | "pending" | "stuck";
+
+export type AuditSyncStateRow = {
+  auditId: string;
+  pendingRows: number;
+  maxAttempts: number;
+  state: AuditSyncState;
+};
+
+// One row per completed audit (same population as getCompletedAudits, which this is merged
+// with by auditId in the screen). Deliberately a SEPARATE query: getCompletedAudits already
+// GROUP BYs a one-to-many join to build pass/fail/na counts, and joining sync_queue in would
+// fan those rows out and corrupt the counts.
+//
+// The queue→audit join is indirect because sync_queue has no auditId column — entityId is
+// the audit id for entity='audits' but the ITEM id for entity='audit_items', so item rows
+// reach their audit via audit_items.auditId. The UNION ALL normalizes both cases to
+// (auditId, attempts) before the rollup.
+//
+// maxAttempts is a parameter for the same reason as getSyncQueueStats above.
+export async function getAuditSyncStates(
+  db: SqlDb,
+  maxAttempts: number
+): Promise<AuditSyncStateRow[]> {
+  const rows = await db.getAllAsync<{
+    auditId: string;
+    pendingRows: number;
+    maxAttempts: number;
+    syncStatus: string;
+  }>(
+    `SELECT a.id AS auditId,
+            COUNT(q.attempts) AS pendingRows,
+            COALESCE(MAX(q.attempts), 0) AS maxAttempts,
+            a.syncStatus AS syncStatus
+     FROM audits a
+     LEFT JOIN (
+       SELECT entityId AS auditId, attempts
+         FROM sync_queue
+        WHERE entity = 'audits'
+       UNION ALL
+       SELECT ai.auditId AS auditId, q.attempts
+         FROM sync_queue q
+         JOIN audit_items ai ON ai.id = q.entityId
+        WHERE q.entity = 'audit_items'
+     ) q ON q.auditId = a.id
+     WHERE a.status = 'complete'
+     GROUP BY a.id`
+  );
+  return rows.map(({ auditId, pendingRows, maxAttempts: attempts, syncStatus }) => ({
+    auditId,
+    pendingRows,
+    maxAttempts: attempts,
+    state:
+      pendingRows > 0 && attempts >= maxAttempts
+        ? "stuck"
+        : pendingRows === 0 && syncStatus === "synced"
+          ? "synced"
+          : "pending",
+  }));
+}
+
 // Queue depth, so the UI can distinguish "nothing queued" from "rows queued but all given
 // up" — the worker collapses both into `status: 'empty'`, and reporting the second as "Up to
 // date" would misrepresent whether the user's work is durable.
