@@ -8,6 +8,7 @@ import { provision } from "../src/db/provision";
 import { supabase } from "../src/supabase";
 import { createAutoSync } from "../src/sync/autoSync";
 import { flushSyncQueue } from "../src/sync/flush";
+import { registerFlushRequester } from "../src/sync/requestFlush";
 import { createSyncScheduler } from "../src/sync/retry";
 
 // Renders nothing — it wires the sync engine's live triggers (7d/7e). Lives inside
@@ -31,12 +32,17 @@ function AutoSync() {
       },
     });
     const auto = createAutoSync({ flush: () => scheduler.trigger() });
+    // Lets the review screen ask for a push right after completing an audit (8b-ii.5).
+    // The coordinator ignores the ask when offline, so no retry chances are spent in a
+    // dead zone — the connectivity-regained trigger below still covers that case.
+    registerFlushRequester(() => void auto.requestFlush());
     const unsubscribe = NetInfo.addEventListener((state) => {
       void auto.onConnectivityChange(
         state.isConnected === true && state.isInternetReachable !== false
       );
     });
     return () => {
+      registerFlushRequester(null);
       unsubscribe();
       timers.forEach(clearTimeout); // cancel pending backoff retries on unmount
     };
