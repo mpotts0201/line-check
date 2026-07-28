@@ -222,7 +222,7 @@ stays exactly where it is inside `SQLiteProvider`.
 | `app/audit/review/[auditId].tsx` | `requestFlush()` → `void syncNow()` (direct import) |
 | `app/history/index.tsx` | `MAX_ATTEMPTS` import gone; badge states become Synced ✓ / Not synced — N waiting; Sync now button stays, now calling `syncNow()` for the shared single-flight guard |
 | `CLAUDE.md` | architecture: backoff line removed; `sync_queue` model loses `attempts`; retry story = "queue stays intact; every trigger re-attempts" |
-| `TODO.md` | 8b-iii **dissolves** (no stuck state, no reset; button stays); 8b-iv shrinks; unplanned rewrite bullet added [x]; mirror TODO_FOR_DUMMIES.md |
+| `TODO.md` | 8b-iii **dissolves** (no stuck state, no reset; button stays); 8b-iv shrinks; unplanned rewrite bullet added [x]; mirror TODO_PLAIN_ENGLISH.md (renamed from TODO_FOR_DUMMIES.md, 2026-07-28) |
 
 End state: `src/sync/` is **two files** — the worker (`flush.ts`) and the trigger
 (`syncEngine.ts`). The word "flush" exists in one file, called from one place.
@@ -275,7 +275,7 @@ If any answer doesn't come, we simplify further. We do not proceed past confusio
 Docs in the same commit: DECISIONS.md entry (state machine over DI plumbing;
 backoff AND attempts dropped with §4's analysis and the acknowledged quarantine
 trade; alternatives rejected: rename-only, XState, no-tests) + CLAUDE.md edits +
-TODO.md restructure (8b-iii dissolved), mirrored in TODO_FOR_DUMMIES.md.
+TODO.md restructure (8b-iii dissolved), mirrored in TODO_PLAIN_ENGLISH.md.
 
 ## 10. Open questions / iteration log
 
