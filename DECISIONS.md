@@ -375,3 +375,67 @@ everything. The engine behaved exactly as designed — it just had no way to say
 - **Renaming the local column to `signaturePath`** — rejected: local holds a device `file://`
   URI and remote holds a Storage object path. They are genuinely different things, and 8a must
   map the post-upload path rather than passing the local URI through.
+
+---
+
+## 2026-07-28 — Sync trigger rewrite: one explicit state machine; backoff, attempts, and give-up removed
+
+**Supersedes:** the 2026-07-20 "Auto-sync: edge-triggered NetInfo flush" and "Retry/backoff:
+per-row attempts" entries (their code is deleted), and items 3/5 of the 2026-07-21 entry
+(`getSyncQueueStats` no longer splits given-up rows or takes a threshold). Full working
+document: `REFACTOR_PROPOSAL.md` (v3, comprehension gate passed 2026-07-27); built as
+R1–R4, 2026-07-28.
+
+**Decision:** The trigger layer (`autoSync.ts` + `createSyncScheduler` + `requestFlush.ts` +
+~30 lines of wiring in `_layout.tsx`) is replaced by ONE file, `src/sync/syncEngine.ts`: an
+explicit two-state machine (`idle | syncing`, module-level state) that every trigger pokes
+through a single `syncNow()`. Timed retry/backoff, the `attempts` counter, and the give-up
+threshold are removed entirely. On failure the queue stays intact and every subsequent poke
+— reconnect edge, audit completion, manual Sync now — simply re-attempts it. Failures are
+surfaced by one `console.warn` at the worker's failure branch (the choke point every trigger
+flows through) plus the badge staying "Not synced". Tests mock modules (`jest.mock`) instead
+of production code carrying DI seams. The dead `attempts` column stays in the schema to
+avoid a migration (drop parked post-7/31).
+
+**Why:**
+- **Comprehension is the bar.** The old layer failed the project's own rule ("I can explain
+  any line if asked"): three files handing closures to each other, `flush` naming three
+  different things, behavior existing only once everything was composed — test-induced
+  design damage. The state machine version is readable top to bottom and the trickery lives
+  in the test file, where trickery belongs.
+- **Backoff auto-healed almost nothing.** Three attempts at 2s/4s spacing only fixed
+  sub-6-second blips while accelerating permanent failures into give-up within ~6 seconds.
+  Event-driven re-attempts fire at moments where success is newly plausible (signal back,
+  user present) — better failure behavior with zero machinery.
+- **The counter never diagnosed anything.** "Failed 3 times" says nothing about why; the
+  actual diagnostic is the surfaced error (7/21 incident). And give-up's original job —
+  stopping a battery-burning timer loop — evaporated when the timer went. A record that
+  never syncs is an app bug or bad data the Zod gate should catch, not something a counter
+  fixes: post-fix, a no-give-up queue drains itself on the next poke, whereas the give-up
+  design needed a manual reset (the 7/21 incident proved it).
+- **The acknowledged trade:** `attempts` had quietly become a quarantine — after 3 failures,
+  poison rows were skipped so later audits could sync around them. Without it, one
+  permanently-rejected row blocks the whole all-or-nothing batch until the underlying bug is
+  fixed (then everything drains automatically). Accepted because poison sources are rare
+  here (single-writer backend, client-side Zod validation), it collapses into the already-
+  documented poison-batch limitation (see README known limitations), and the production
+  remedy has a name: fail-then-split bisection.
+- **Findings the process surfaced (logged in REFACTOR_PROPOSAL §10):** the comprehension
+  gate found flush failures on the auto/Submit paths were fully silent (warn was only in the
+  History button handler → moved to the worker's failure branch); R2 planning found the
+  engine's ignore-the-result contract killed History's result-driven status text (owner
+  call: console-only — the status line now reads queue stats); R2 review found
+  `flushSyncQueue` can throw past its own error handling, so `syncNow` swallows-and-warns
+  rather than rejecting through fire-and-forget call sites.
+
+**Alternatives considered:**
+- **Rename-only refactor** (keep the three files, better names) — rejected: the problem was
+  indirection, not naming; the behavior would still only exist in composition.
+- **XState (or any FSM library)** — rejected: a 2-state machine with one guard line does not
+  need a dependency; the library's ceremony would exceed the entire engine.
+- **Dropping the trigger tests instead of the DI plumbing** — rejected: the tests are
+  valuable; what had to go was production code shaped for tests. `jest.mock` moves the
+  seams into the test file.
+- **Keeping attempts as quarantine only** (no backoff, skip rows after N failures) —
+  rejected: keeps the counter, the threshold, the reset UX, and the stuck state for a
+  poison scenario that is rare here and better handled by the documented production remedy.

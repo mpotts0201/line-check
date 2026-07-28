@@ -43,16 +43,16 @@ Everything must remain **Expo Go (SDK 54) compatible** until we deliberately mov
 
 ### Offline-first data flow
 1. UI writes go to **SQLite immediately** (optimistic, no spinners for local ops)
-2. Every mutation also appends a row to `sync_queue`
-3. A NetInfo listener + manual pull-to-sync flushes the queue when online: audits → audit_items → photo uploads
-4. Retries use exponential backoff (`attempts` column); conflict resolution is **last-write-wins on `updatedAt`**
-5. Sync state is always visible in the UI (pending badges, "N items waiting to sync")
+2. Completing an audit appends full-row snapshot rows to `sync_queue` in the same transaction (completion-only enqueue — see DECISIONS 2026-07-20; draft edits stay local)
+3. A two-state sync engine (`src/sync/syncEngine.ts`, `idle | syncing`) decides WHEN to push. Three pokes call its `syncNow()`: the offline→online edge (NetInfo), audit completion, and the manual Sync now button. The flush pushes audits → audit_items in FK order (photo upload is a deferred stretch goal)
+4. There is no retry counter or backoff: on failure the queue stays intact and every subsequent poke re-attempts the whole batch (see DECISIONS 2026-07-28). Conflict resolution is **last-write-wins on `updatedAt`**
+5. Sync state is always visible in the UI (per-audit badges: "Synced ✓" / "Not synced — N waiting")
 
 ### Data model (SQLite)
 - `locations`: id, name, address
 - `audits`: id, locationId, status ('draft' | 'complete'), startedAt, completedAt, signatureUri, syncStatus
 - `audit_items`: id, auditId, station, label, result ('pass' | 'fail' | 'na'), tempReading, note, photoUri, updatedAt
-- `sync_queue`: id, entity, entityId, operation, payload (JSON), createdAt, attempts
+- `sync_queue`: id, entity, entityId, operation, payload (JSON), createdAt (a dead `attempts` column also exists — retry counting was removed; kept to avoid a migration)
 
 IDs are client-generated UUIDs (so offline creation never blocks on the server).
 

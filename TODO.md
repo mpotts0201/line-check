@@ -86,7 +86,10 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
   online → Synced ✓ with no tap; airplane-mode complete → Not synced → reconnect
   → Synced ✓; forced failure → badge stays Not synced, error in console, manual
   Sync now retries.
-- [ ] **R5 — Docs.** DECISIONS.md entry: state machine over DI plumbing; backoff
+- [x] **R5 — Docs.** (2026-07-28. DECISIONS entry supersedes the 7d/7e entries
+  and parts of the 7/21 entry; README gained the merged known-limitations
+  story; CLAUDE.md architecture now describes the engine. README's photo
+  mentions left for the README/demo session.) DECISIONS.md entry: state machine over DI plumbing; backoff
   AND attempts dropped with §4's analysis and the acknowledged quarantine trade;
   alternatives rejected (rename-only, XState, no-tests); `attempts` column left
   dead deliberately (drop is parked below). CLAUDE.md: backoff line removed from

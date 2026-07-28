@@ -42,11 +42,12 @@ session.
   moment. History cards now say either "Synced ✓" or "Not synced — N waiting" —
   no more "stuck" state, so no per-audit Retry button is needed; the regular
   Sync now button covers everything.
-- **R5 — Write it down.** Update the decision log, the project instructions, and
-  the README's honest known-weakness section: one bad row can block a whole sync
-  batch until the underlying bug is fixed. Accepted on purpose, and the real fix
-  has a name (split the failing batch in half and retry each half) — a weakness
-  you found and can explain beats one you hid.
+- **R5 — Write it down (done July 28).** The decision log, the project
+  instructions, and the README now tell the new story. The README's honest
+  known-weakness section is in: one bad row can block a whole sync batch until
+  the underlying bug is fixed. Accepted on purpose, and the real fix has a name
+  (split the failing batch in half and retry each half) — a weakness you found
+  and can explain beats one you hid.
 
 Each step leaves the app working and demo-able, so if the 31st lands mid-rewrite,
 we ship anyway.
