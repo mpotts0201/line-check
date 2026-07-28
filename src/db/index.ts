@@ -48,7 +48,7 @@ export async function migrate(db: SqlDb) {
       operation TEXT NOT NULL,     -- 'upsert' for now
       payload TEXT NOT NULL,       -- JSON snapshot of the row
       createdAt TEXT NOT NULL,
-      attempts INTEGER NOT NULL DEFAULT 0   -- 7e backoff counter
+      attempts INTEGER NOT NULL DEFAULT 0   -- dead: retry counting removed; kept to avoid a migration
     );
   `);
 }

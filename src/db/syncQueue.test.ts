@@ -4,10 +4,6 @@ import { getCompletedAudits } from "./audits";
 import { getAuditSyncStates } from "./syncQueue";
 import { type SqlDb } from "./types";
 
-// The worker's real give-up threshold is MAX_ATTEMPTS in src/sync/retry.ts, but src/db must
-// not import from src/sync, so tests pass the same literal the production callers inject.
-const THRESHOLD = 3;
-
 // Seed a completed audit + 2 items, mirroring what completeAudit leaves behind. Queue rows
 // are added per-test (each test wants a different queue shape). Literal ids keep the test
 // pure (no expo-crypto).
@@ -44,21 +40,20 @@ async function enqueueRow(
   db: SqlDb,
   id: string,
   entity: "audits" | "audit_items",
-  entityId: string,
-  attempts = 0
+  entityId: string
 ): Promise<void> {
   await db.runAsync(
     `INSERT INTO sync_queue (id, entity, entityId, operation, payload, createdAt, attempts)
-     VALUES (?, ?, ?, 'upsert', '{}', ?, ?)`,
-    id, entity, entityId, "2026-07-20T10:05:00.001Z", attempts
+     VALUES (?, ?, ?, 'upsert', '{}', ?, 0)`,
+    id, entity, entityId, "2026-07-20T10:05:00.001Z"
   );
 }
 
 // Queue rows exactly as completeAudit enqueues them: one audit row + one per item.
-async function enqueueAudit(db: SqlDb, auditId: string, attempts = 0): Promise<void> {
-  await enqueueRow(db, `q-${auditId}`, "audits", auditId, attempts);
-  await enqueueRow(db, `q-${auditId}-1`, "audit_items", `${auditId}-item-1`, attempts);
-  await enqueueRow(db, `q-${auditId}-2`, "audit_items", `${auditId}-item-2`, attempts);
+async function enqueueAudit(db: SqlDb, auditId: string): Promise<void> {
+  await enqueueRow(db, `q-${auditId}`, "audits", auditId);
+  await enqueueRow(db, `q-${auditId}-1`, "audit_items", `${auditId}-item-1`);
+  await enqueueRow(db, `q-${auditId}-2`, "audit_items", `${auditId}-item-2`);
 }
 
 describe("getAuditSyncStates", () => {
@@ -68,10 +63,10 @@ describe("getAuditSyncStates", () => {
     await seedAudit(db, "aud-1");
     await enqueueAudit(db, "aud-1");
 
-    const states = await getAuditSyncStates(db, THRESHOLD);
+    const states = await getAuditSyncStates(db);
 
     expect(states).toEqual([
-      { auditId: "aud-1", pendingRows: 3, maxAttempts: 0, state: "pending" },
+      { auditId: "aud-1", pendingRows: 3, state: "pending" },
     ]);
     db.close();
   });
@@ -81,24 +76,30 @@ describe("getAuditSyncStates", () => {
     await migrate(db);
     await seedAudit(db, "aud-1", { syncStatus: "synced" }); // queue drained, status flipped
 
-    const states = await getAuditSyncStates(db, THRESHOLD);
+    const states = await getAuditSyncStates(db);
 
     expect(states).toEqual([
-      { auditId: "aud-1", pendingRows: 0, maxAttempts: 0, state: "synced" },
+      { auditId: "aud-1", pendingRows: 0, state: "synced" },
     ]);
     db.close();
   });
 
-  it("reports an audit at the give-up threshold as stuck", async () => {
+  it("ignores the dead attempts column — a much-failed audit still reads pending", async () => {
     const db = createTestDb();
     await migrate(db);
     await seedAudit(db, "aud-1");
-    await enqueueAudit(db, "aud-1", THRESHOLD);
+    // Seed a high failure count directly. The column still exists (kept to avoid a
+    // migration) but nothing derives state from it anymore — there is no stuck state,
+    // and this row drains on the next successful poke like any other.
+    await db.runAsync(
+      `INSERT INTO sync_queue (id, entity, entityId, operation, payload, createdAt, attempts)
+       VALUES ('q-old', 'audits', 'aud-1', 'upsert', '{}', '2026-07-20T10:05:00.001Z', 99)`
+    );
 
-    const states = await getAuditSyncStates(db, THRESHOLD);
+    const states = await getAuditSyncStates(db);
 
     expect(states).toEqual([
-      { auditId: "aud-1", pendingRows: 3, maxAttempts: THRESHOLD, state: "stuck" },
+      { auditId: "aud-1", pendingRows: 1, state: "pending" },
     ]);
     db.close();
   });
@@ -112,10 +113,10 @@ describe("getAuditSyncStates", () => {
     await enqueueRow(db, "q-1", "audit_items", "aud-1-item-1");
     await enqueueRow(db, "q-2", "audit_items", "aud-1-item-2");
 
-    const states = await getAuditSyncStates(db, THRESHOLD);
+    const states = await getAuditSyncStates(db);
 
     expect(states).toEqual([
-      { auditId: "aud-1", pendingRows: 2, maxAttempts: 0, state: "pending" },
+      { auditId: "aud-1", pendingRows: 2, state: "pending" },
     ]);
     db.close();
   });
@@ -125,7 +126,7 @@ describe("getAuditSyncStates", () => {
     await migrate(db);
     await seedAudit(db, "aud-1"); // no queue rows, but remote never confirmed
 
-    const states = await getAuditSyncStates(db, THRESHOLD);
+    const states = await getAuditSyncStates(db);
 
     expect(states[0].state).toBe("pending");
     db.close();
@@ -136,12 +137,12 @@ describe("getAuditSyncStates", () => {
     await migrate(db);
     await seedAudit(db, "aud-1", { syncStatus: "synced" });
     await seedAudit(db, "aud-2");
-    await enqueueAudit(db, "aud-2", THRESHOLD);
+    await enqueueAudit(db, "aud-2");
 
-    const states = await getAuditSyncStates(db, THRESHOLD);
+    const states = await getAuditSyncStates(db);
 
     const byId = Object.fromEntries(states.map((s) => [s.auditId, s.state]));
-    expect(byId).toEqual({ "aud-1": "synced", "aud-2": "stuck" });
+    expect(byId).toEqual({ "aud-1": "synced", "aud-2": "pending" });
     db.close();
   });
 

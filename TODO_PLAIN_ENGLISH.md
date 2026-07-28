@@ -36,12 +36,12 @@ session.
   so that hole never shipped — and the History screen's detailed sync-result
   text is gone. Its status line now just reads the waiting list ("Up to date"
   or "N waiting"), because the new engine deliberately doesn't report results.
-- **R3 — Stop counting failures.** The retry counter and the "give up after 3
-  tries" rule go away. A failed sync just stays on the waiting list and gets
-  tried again at the next natural moment.
-- **R4 — Simpler badges.** History cards say either "Synced ✓" or "Not synced —
-  N waiting". There's no more "stuck" state, so the planned per-audit Retry
-  button isn't needed — the regular Sync now button covers everything.
+- **R3 + R4 — Stop counting failures; simpler badges (done together, July 28).**
+  The retry counter and the "give up after 3 tries" rule are gone. A failed sync
+  just stays on the waiting list and gets tried again at the next natural
+  moment. History cards now say either "Synced ✓" or "Not synced — N waiting" —
+  no more "stuck" state, so no per-audit Retry button is needed; the regular
+  Sync now button covers everything.
 - **R5 — Write it down.** Update the decision log, the project instructions, and
   the README's honest known-weakness section: one bad row can block a whole sync
   batch until the underlying bug is fixed. Accepted on purpose, and the real fix

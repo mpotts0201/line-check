@@ -9,7 +9,6 @@ import {
   getSyncQueueStats,
   type AuditSyncStateRow,
 } from "../../src/db/syncQueue";
-import { MAX_ATTEMPTS } from "../../src/sync/retry";
 import { syncNow } from "../../src/sync/syncEngine";
 
 // completedAt is an ISO string; show its date portion. Kept manual (no date lib, no
@@ -46,23 +45,22 @@ function formatSyncError(error: unknown): string {
   return String(error);
 }
 
-// Named here rather than inline so the three states can't drift apart; a shared theme
-// constants file is 8b-iv's problem (stuck reuses the fail-count red already in this file).
+// Named here rather than inline so the two states can't drift apart; a shared theme
+// constants file is 8b-iv's problem. Not-synced stays gray, not red — it isn't a dead
+// state, it self-heals on the next poke.
 const BADGE_COLOR = {
   synced: "#2e7d32",
-  stuck: "#c0392b",
   pending: "#999",
 } as const;
 
 // Badge text + tint for one audit's card. The lookup can miss only if an audit completed
-// between the two queries in refresh(); the fallback reads Pending for the same reason a
+// between the two queries in refresh(); the fallback reads Not synced for the same reason a
 // drained-queue-but-unconfirmed audit does — never claim a confirmation we don't have.
 function syncBadge(state: AuditSyncStateRow | undefined): { label: string; color: string } {
   if (state?.state === "synced") return { label: "Synced ✓", color: BADGE_COLOR.synced };
-  if (state?.state === "stuck") return { label: "Not synced", color: BADGE_COLOR.stuck };
   const waiting = state?.pendingRows ?? 0;
   return {
-    label: waiting > 0 ? `Pending — ${waiting} waiting` : "Pending",
+    label: waiting > 0 ? `Not synced — ${waiting} waiting` : "Not synced",
     color: BADGE_COLOR.pending,
   };
 }
@@ -77,12 +75,12 @@ export default function History() {
 
   // Summaries and sync states are two queries merged here by audit id — joining sync_queue
   // into the summaries query would fan out the GROUP BY that builds the pass/fail/na counts
-  // (see getAuditSyncStates). MAX_ATTEMPTS is injected at this layer; src/db never sees it.
+  // (see getAuditSyncStates).
   const refresh = useCallback(async () => {
     try {
       const [completed, states] = await Promise.all([
         getCompletedAudits(db),
-        getAuditSyncStates(db, MAX_ATTEMPTS),
+        getAuditSyncStates(db),
       ]);
       setAudits(completed);
       setSyncStates(Object.fromEntries(states.map((s) => [s.auditId, s])));
@@ -127,17 +125,9 @@ export default function History() {
     await syncNow();
 
     // The engine ignores the flush result on purpose, so read the outcome where it lives:
-    // the queue. Empty = everything landed; leftovers are waiting or gave up. Reporting
-    // given-up rows as "Up to date" would be a false statement about durability — nothing
-    // retries them until the give-up rule itself dissolves in R3.
-    const { total, givenUp } = await getSyncQueueStats(db, MAX_ATTEMPTS);
-    if (total === 0) {
-      setSyncStatus("Up to date");
-    } else if (givenUp > 0) {
-      setSyncStatus(`${givenUp} rows gave up after ${MAX_ATTEMPTS} attempts — not synced`);
-    } else {
-      setSyncStatus(`${total} rows still waiting`);
-    }
+    // the queue. Empty = everything landed; anything left is waiting for the next poke.
+    const { total } = await getSyncQueueStats(db);
+    setSyncStatus(total === 0 ? "Up to date" : `${total} rows still waiting`);
 
     await refresh();
   }

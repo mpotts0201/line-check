@@ -59,7 +59,8 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
   (unhandled rejection on the fire-and-forget completion flush) by deleting that
   path. AC: tsc clean; remaining suites green; device sanity: all three pokes
   (reconnect edge, Submit, manual button) reach the engine.
-- [ ] **R3 — Worker stops counting.** `src/sync/flush.ts`: delete the
+- [x] **R3 — Worker stops counting.** (2026-07-28, merged with R4 in one
+  session — owner call, deadline lever from the refresh plan.) `src/sync/flush.ts`: delete the
   `attempts < MAX_ATTEMPTS` eligible filter and the `incrementSyncQueueAttempts`
   call; error result becomes `{ status: "error"; error: unknown }`. (The
   failure-branch `console.warn` — the gate-Q3 fix — already landed in R2;
@@ -73,7 +74,9 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
   (History stopped reading the flush result in R2 — no screen changes here.)
   AC: tsc clean; flush suite green; a failing push warns once at the choke
   point regardless of trigger.
-- [ ] **R4 — Badge simplifies; retry.ts dies.** `src/db/syncQueue.ts`:
+- [x] **R4 — Badge simplifies; retry.ts dies.** (2026-07-28, same session as
+  R3. retry.test.ts went with it — deleting the scheduler and backoffDelay
+  left it empty.) `src/db/syncQueue.ts`:
   `getAuditSyncStates` returns synced/pending only (no `maxAttempts`, no threshold
   param); `getSyncQueueStats` drops the gave-up split. `app/history/index.tsx`:
   badge becomes "Synced ✓" / "Not synced — N waiting"; `MAX_ATTEMPTS` import gone.
@@ -120,7 +123,11 @@ app demo-able for exactly this reason.**
 ---
 
 ## Parked (post-7/31)
-- [ ] Drop the dead `attempts` column (small migration).
+- [ ] Drop the dead `attempts` column (small migration). Sites to touch (from
+  the R3+R4 review): the schema comment (`src/db/index.ts`), enqueue's INSERT +
+  comment and the `SyncQueueRow` comment (`src/db/syncQueue.ts`), the two test
+  helpers that still INSERT the column, and `getPendingSyncQueue`'s `SELECT *`
+  (list columns explicitly while there).
 - [ ] History badge updates in real time instead of on focus — needs a data→UI
   notification (small Zustand store or refetch-on-sync-complete signal).
   Explicitly NOT part of the refactor (owner request 2026-07-27).

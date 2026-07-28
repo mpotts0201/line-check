@@ -87,9 +87,6 @@ const queueCount = (db: SqlDb) =>
 const syncStatus = (db: SqlDb) =>
   db.getFirstAsync<{ syncStatus: string }>("SELECT syncStatus FROM audits WHERE id = 'aud-1'")
     .then((r) => r?.syncStatus);
-// Max attempts across all queue rows (they climb together, all-or-nothing).
-const maxAttempts = (db: SqlDb) =>
-  db.getFirstAsync<{ n: number }>("SELECT MAX(attempts) AS n FROM sync_queue").then((r) => r?.n);
 
 describe("flushSyncQueue", () => {
   it("pushes queued rows, then drains the queue and flips syncStatus", async () => {
@@ -178,38 +175,36 @@ describe("flushSyncQueue", () => {
     db.close();
   });
 
-  // ---- T7e: retry / backoff / give-up ----
+  // ---- failure path: the queue stays intact, every run retries ----
 
-  it("increments attempts and keeps rows queued on failure", async () => {
+  it("keeps the whole batch queued on failure", async () => {
     const db = createTestDb();
     await seed(db);
     const fake = createFakeSupabase({ throwOn: { table: "audits", times: 1 } });
 
     const result = await flushSyncQueue(db, fake.client);
 
-    expect(result).toEqual({ status: "error", error: expect.anything(), attempts: 1 });
+    expect(result).toEqual({ status: "error", error: expect.anything() });
     expect(await queueCount(db)).toBe(3); // nothing deleted
-    expect(await maxAttempts(db)).toBe(1); // every row bumped 0 → 1
     expect(await syncStatus(db)).toBe("pending"); // not flipped
     db.close();
   });
 
-  it("gives up after MAX_ATTEMPTS and stops retrying those rows", async () => {
+  it("retries on every run — there is no give-up", async () => {
     const db = createTestDb();
     await seed(db);
     const fake = createFakeSupabase({ throwOn: { table: "audits", times: 99 } }); // always fails
 
-    for (let i = 1; i <= 3; i++) {
+    // Four straight failures: each run still attempts the push (one audits upsert per
+    // run — the fake throws before audit_items is reached) and the queue never shrinks.
+    // The old design skipped the batch as given-up on the 4th run; now recovery needs no
+    // reset — the next successful poke drains everything.
+    for (let run = 1; run <= 4; run++) {
       const result = await flushSyncQueue(db, fake.client);
-      expect(result).toMatchObject({ status: "error", attempts: i });
+      expect(result).toMatchObject({ status: "error" });
+      expect(fake.callOrder.length).toBe(run); // an upsert WAS attempted this run
     }
-    expect(await maxAttempts(db)).toBe(3);
-
-    const callsBefore = fake.callOrder.length;
-    const fourth = await flushSyncQueue(db, fake.client);
-    expect(fourth).toEqual({ status: "empty" }); // given-up rows are skipped
-    expect(fake.callOrder.length).toBe(callsBefore); // no upsert attempted
-    expect(await queueCount(db)).toBe(3); // still queued, awaiting a manual retry (8b)
+    expect(await queueCount(db)).toBe(3);
     db.close();
   });
 
@@ -218,8 +213,8 @@ describe("flushSyncQueue", () => {
     await seed(db);
     const fake = createFakeSupabase({ throwOn: { table: "audits", times: 2 } }); // fail twice
 
-    await flushSyncQueue(db, fake.client); // attempts → 1
-    await flushSyncQueue(db, fake.client); // attempts → 2
+    await flushSyncQueue(db, fake.client); // fails — queue intact
+    await flushSyncQueue(db, fake.client); // fails — queue intact
     const recovered = await flushSyncQueue(db, fake.client); // succeeds
 
     expect(recovered).toEqual({ status: "synced", audits: 1, items: 2 });

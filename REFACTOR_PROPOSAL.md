@@ -316,8 +316,13 @@ TODO.md restructure (8b-iii dissolved), mirrored in TODO_PLAIN_ENGLISH.md.
   finally makes "safe to call from anywhere, any time" literally true. Test
   case 7 covers it. This is the residue of 8b-ii.5's waived W1, now resolved
   at the engine rather than per call site.
-- OPEN: `attempts` column — drop via a small migration (cleaner) or leave dead
-  in the schema (zero-risk)? Owner's call at build time.
+- R3+R4 merged into one session (2026-07-28, owner call — the deadline lever
+  named at TODO-refresh time). The no-give-up design is fully live; `src/sync/`
+  reached the §6 end state (flush.ts + syncEngine.ts). The give-up test in
+  flush.test.ts was inverted into the regression test for the new semantics
+  ("retries on every run — there is no give-up").
+- RESOLVED (2026-07-28): `attempts` column left dead in the schema (zero-risk);
+  dropping it is a parked post-7/31 bullet in TODO.md.
 - OPEN: README known-limitations wording — merge the poison-batch note and the
   no-quarantine trade into one story (fail-then-split bisection as the
   production remedy).

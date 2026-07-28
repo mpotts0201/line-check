@@ -1,11 +1,6 @@
 import { type SqlDb } from "../db/types";
-import {
-  deleteSyncQueueRows,
-  getPendingSyncQueue,
-  incrementSyncQueueAttempts,
-} from "../db/syncQueue";
+import { deleteSyncQueueRows, getPendingSyncQueue } from "../db/syncQueue";
 import { markAuditsSynced } from "../db/audits";
-import { MAX_ATTEMPTS } from "./retry";
 
 // The narrow slice of the Supabase client the worker needs — its DI seam. Typed with
 // PromiseLike so BOTH the real (thenable) Postgrest builder and a Promise-returning test fake
@@ -23,7 +18,7 @@ export interface SyncClient {
 export type FlushResult =
   | { status: "empty" }
   | { status: "synced"; audits: number; items: number }
-  | { status: "error"; error: unknown; attempts: number };
+  | { status: "error"; error: unknown };
 
 // camelCase local payload → snake_case remote row (the remote convention, matching the
 // existing locations/checklist_templates tables). Also drops the local-only `syncStatus`;
@@ -66,13 +61,10 @@ function toRemoteItem(p: any): Record<string, unknown> {
 // a mid-flush crash merges rather than duplicating.
 export async function flushSyncQueue(db: SqlDb, client: SyncClient): Promise<FlushResult> {
   const pending = await getPendingSyncQueue(db);
-  // Skip rows that have given up (attempts hit the threshold) — auto-sync stops retrying them
-  // until 8b's per-audit manual retry resets attempts.
-  const eligible = pending.filter((r) => r.attempts < MAX_ATTEMPTS);
-  if (eligible.length === 0) return { status: "empty" };
+  if (pending.length === 0) return { status: "empty" };
 
-  const auditRows = eligible.filter((r) => r.entity === "audits");
-  const itemRows = eligible.filter((r) => r.entity === "audit_items");
+  const auditRows = pending.filter((r) => r.entity === "audits");
+  const itemRows = pending.filter((r) => r.entity === "audit_items");
 
   let failed: unknown | null = null;
   try {
@@ -103,19 +95,14 @@ export async function flushSyncQueue(db: SqlDb, client: SyncClient): Promise<Flu
     // read the flush result, so without this line a failed push would be invisible.
     // In production this is where telemetry would hang.
     console.warn("[sync] flush failed", failed);
-    // Leave the whole batch queued (all-or-nothing) and bump attempts so stuck rows
-    // eventually give up. (Attempts and the give-up rule dissolve in R3.)
-    await incrementSyncQueueAttempts(db, eligible.map((r) => r.id));
-    return {
-      status: "error",
-      error: failed,
-      attempts: Math.min(...eligible.map((r) => r.attempts)) + 1,
-    };
+    // Leave the whole batch queued (all-or-nothing). Nothing is counted or scheduled:
+    // the next poke — signal edge, Submit, manual button — simply retries all of it.
+    return { status: "error", error: failed };
   }
 
   // Confirmed pushed → drain the flushed rows and flip syncStatus in one local transaction.
   await db.withTransactionAsync(async () => {
-    await deleteSyncQueueRows(db, eligible.map((r) => r.id));
+    await deleteSyncQueueRows(db, pending.map((r) => r.id));
     await markAuditsSynced(db, auditRows.map((r) => r.entityId));
   });
 
