@@ -116,6 +116,25 @@ describe("syncEngine", () => {
     expect(mockFlush).toHaveBeenCalledTimes(2);
   });
 
+  it("swallows an unexpected worker throw, warns, and returns to idle", async () => {
+    listener(report(true, true)); // get online; setup sync uses the automock
+    await settle();
+    mockFlush.mockClear();
+
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    mockFlush.mockRejectedValueOnce(new Error("db exploded"));
+
+    // Resolves (not rejects) — pokes are fire-and-forget, so a rejection here
+    // would be unhandled at every call site.
+    await expect(syncNow()).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+
+    // The finally brought the busy flag down: the next poke pushes again.
+    await syncNow();
+    expect(mockFlush).toHaveBeenCalledTimes(2);
+  });
+
   it("after cleanup, pokes do nothing", async () => {
     const unsubscribe = mockAddEventListener.mock.results[0].value as jest.Mock;
     stop();

@@ -44,7 +44,10 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
   `jest.mock("./flush")` + `jest.mock("@react-native-community/netinfo")`, no fake
   timers. NOTHING else changes — the old trigger layer still runs the app.
   AC: tsc clean; new suite green (human runs jest on Windows); no other files touched.
-- [ ] **R2 — The swap.** `app/_layout.tsx`: `AutoSync` becomes §5b's small effect
+- [x] **R2 — The swap.** (2026-07-28; two planning decisions logged in
+  REFACTOR_PROPOSAL §10 — status line went console-only, and the flush.ts
+  failure-branch `console.warn` was pulled forward out of R3 so no session
+  shipped with silent flush failures.) `app/_layout.tsx`: `AutoSync` becomes §5b's small effect
   (`startSyncEngine(db)`, return its stop function); imports for `createAutoSync`,
   `createSyncScheduler`, `registerFlushRequester`, NetInfo, `supabase`, and
   `flushSyncQueue` all go. `app/audit/review/[auditId].tsx`: `requestFlush()` →
@@ -58,14 +61,18 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
   (reconnect edge, Submit, manual button) reach the engine.
 - [ ] **R3 — Worker stops counting.** `src/sync/flush.ts`: delete the
   `attempts < MAX_ATTEMPTS` eligible filter and the `incrementSyncQueueAttempts`
-  call; error result becomes `{ status: "error"; error: unknown }`; ADD
-  `console.warn` in the failure branch — the gate-Q3 fix, the one choke point
-  every trigger flows through (History keeps its `__DEV__` decoded display).
+  call; error result becomes `{ status: "error"; error: unknown }`. (The
+  failure-branch `console.warn` — the gate-Q3 fix — already landed in R2;
+  keep it when reshaping the branch.)
   Delete `incrementSyncQueueAttempts` from `src/db/syncQueue.ts`. Update
   `flush.test.ts`: attempts assertions out; idempotency, FK ordering,
-  delete-on-confirm, crash recovery all stay. `app/history/index.tsx`'s result
-  handling adjusts to the new `FlushResult` shape. AC: tsc clean; flush suite
-  green; a failing push warns once at the choke point regardless of trigger.
+  delete-on-confirm, crash recovery all stay. Sequencing note (found in R2):
+  `createSyncScheduler` reads `result.attempts`, so the `FlushResult` change
+  breaks it — R3 also deletes the scheduler (unwired since R2) and its
+  describe block, leaving retry.ts = the `MAX_ATTEMPTS` export only until R4.
+  (History stopped reading the flush result in R2 — no screen changes here.)
+  AC: tsc clean; flush suite green; a failing push warns once at the choke
+  point regardless of trigger.
 - [ ] **R4 — Badge simplifies; retry.ts dies.** `src/db/syncQueue.ts`:
   `getAuditSyncStates` returns synced/pending only (no `maxAttempts`, no threshold
   param); `getSyncQueueStats` drops the gave-up split. `app/history/index.tsx`:

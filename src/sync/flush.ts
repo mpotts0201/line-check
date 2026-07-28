@@ -62,7 +62,7 @@ function toRemoteItem(p: any): Record<string, unknown> {
 // completion BEFORE children (audit_items) so FKs resolve server-side, then — only on
 // confirmed success — deletes the flushed queue rows and flips syncStatus, atomically.
 // Any returned error or thrown network failure returns early with the queue untouched, so
-// the whole batch is safe to retry (7e adds backoff). Upserts key on `id`, so a re-run after
+// the whole batch is safe to retry on the next poke. Upserts key on `id`, so a re-run after
 // a mid-flush crash merges rather than duplicating.
 export async function flushSyncQueue(db: SqlDb, client: SyncClient): Promise<FlushResult> {
   const pending = await getPendingSyncQueue(db);
@@ -98,9 +98,13 @@ export async function flushSyncQueue(db: SqlDb, client: SyncClient): Promise<Flu
   }
 
   if (failed !== null) {
-    // Leave the whole batch queued (all-or-nothing) and bump attempts so the backoff clock
-    // advances and stuck rows eventually give up. The freshest eligible row's new count drives
-    // the retry cadence (for a single audit that's just its attempts).
+    // Surface the failure at the ONE choke point every trigger flows through — the
+    // reconnect edge, Submit, and the manual button all end up here. Screens no longer
+    // read the flush result, so without this line a failed push would be invisible.
+    // In production this is where telemetry would hang.
+    console.warn("[sync] flush failed", failed);
+    // Leave the whole batch queued (all-or-nothing) and bump attempts so stuck rows
+    // eventually give up. (Attempts and the give-up rule dissolve in R3.)
     await incrementSyncQueueAttempts(db, eligible.map((r) => r.id));
     return {
       status: "error",

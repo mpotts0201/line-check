@@ -3,7 +3,7 @@ import { useSQLiteContext } from "expo-sqlite";
 import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getAuditItems, completeAudit, type AuditItem } from "../../../src/db/audits";
-import { requestFlush } from "../../../src/sync/requestFlush";
+import { syncNow } from "../../../src/sync/syncEngine";
 import { auditCompleteSchema } from "../../../src/validation/audit";
 
 export default function ReviewSign() {
@@ -43,10 +43,10 @@ export default function ReviewSign() {
 
   async function onComplete() {
     await completeAudit(db, auditId);
-    // Ask the sync engine to push now if there's signal (does nothing offline — the audit
-    // is already durable in SQLite and the reconnect trigger covers it). Deliberately not
-    // awaited: navigation must never wait on the network.
-    requestFlush();
+    // Poke the sync engine: push now if it makes sense. It quietly does nothing offline —
+    // the audit is already durable in SQLite and the reconnect trigger covers it later.
+    // Deliberately not awaited: navigation must never wait on the network.
+    void syncNow();
     router.replace("/history"); // to History; replace so the completed review isn't in the back stack
   }
 

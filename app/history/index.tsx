@@ -9,9 +9,8 @@ import {
   getSyncQueueStats,
   type AuditSyncStateRow,
 } from "../../src/db/syncQueue";
-import { supabase } from "../../src/supabase";
-import { flushSyncQueue } from "../../src/sync/flush";
 import { MAX_ATTEMPTS } from "../../src/sync/retry";
+import { syncNow } from "../../src/sync/syncEngine";
 
 // completedAt is an ISO string; show its date portion. Kept manual (no date lib, no
 // reliance on Hermes Intl) so it renders identically on every device.
@@ -19,11 +18,12 @@ function formatDate(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "—";
 }
 
-// TEMPORARY (sync debugging) — renders whatever the flush worker caught. A PostgrestError
-// carries code/message/details/hint, but the worker types the failure as `unknown` (its DI
-// seam admits a test fake too), so narrow structurally rather than casting. The `code` is
-// the useful part: PGRST205 = missing table, PGRST204 = missing column, 42501 = RLS,
-// 42P10 = no unique constraint for onConflict, 23503 = FK violation.
+// Renders whatever this screen's own catch paths trap (a failed load, a failed reset, or
+// an unexpected throw out of syncNow). Flush failures no longer land here — they warn at
+// flush.ts's choke point and reach this screen only as a badge that stays un-synced.
+// Errors arrive as `unknown`, so narrow structurally rather than casting; Postgrest-shaped
+// objects (code/message/details/hint) still format usefully if one ever surfaces this way.
+// 8b-iv extracts this into SyncBar.
 function formatSyncError(error: unknown): string {
   // Error first: an Error also satisfies the object check below, and its `message` is the
   // whole story. Checking it second would make this branch unreachable.
@@ -102,16 +102,17 @@ export default function History() {
     }, [refresh])
   );
 
-  // Manual flush trigger. Auto-sync on connectivity return is now wired at the app root (7d);
-  // this stays as a manual control for now and becomes a per-audit give-up fallback in 7e. This
-  // screen injects the real `supabase` singleton, so the worker itself stays singleton-free.
+  // Manual sync — the third poke (the others: the reconnect edge and Submit). Goes through
+  // syncNow() so all three share the engine's single-flight guard; before this, the button
+  // called the worker directly and could race an in-flight auto-sync.
   async function onSyncNow() {
     setSyncing(true);
     try {
       await runSync();
     } catch (error) {
-      // flushSyncQueue returns failures and refresh() self-catches, so only a direct DB
-      // throw (e.g. getSyncQueueStats) lands here — surface it rather than reject silently.
+      // syncNow never throws (the engine warns and swallows internally), so only this
+      // screen's own follow-up — getSyncQueueStats — can land here. Surface it rather
+      // than reject silently.
       console.warn("[sync] unexpected failure", error);
       setSyncStatus(`Sync failed — ${formatSyncError(error)}`);
     } finally {
@@ -122,37 +123,20 @@ export default function History() {
   }
 
   async function runSync() {
-    const result = await flushSyncQueue(db, supabase);
+    // Resolves when the push finishes — or immediately, if offline or one is in flight.
+    await syncNow();
 
-    if (result.status === "synced") {
-      setSyncStatus(`Synced ${result.audits} audits · ${result.items} items`);
-    } else if (result.status === "empty") {
-      // "empty" conflates two states: nothing queued, and rows queued but ALL given up
-      // (the worker returns it when no row has attempts < MAX_ATTEMPTS). Reporting the second
-      // as "Up to date" would be a false statement about durability — and "queued" would
-      // understate it too, since auto-sync will never retry these on its own until 8b's
-      // per-audit "Retry sync" lands. Say they gave up.
-      const { total, givenUp } = await getSyncQueueStats(db, MAX_ATTEMPTS);
-      if (total === 0) {
-        setSyncStatus("Up to date");
-      } else if (givenUp > 0) {
-        setSyncStatus(`${givenUp} rows gave up after ${MAX_ATTEMPTS} attempts — not synced`);
-      } else {
-        // Only reachable if auto-sync enqueued a fresh, still-eligible row between the flush
-        // and this count.
-        setSyncStatus(`${total} rows queued`);
-      }
+    // The engine ignores the flush result on purpose, so read the outcome where it lives:
+    // the queue. Empty = everything landed; leftovers are waiting or gave up. Reporting
+    // given-up rows as "Up to date" would be a false statement about durability — nothing
+    // retries them until the give-up rule itself dissolves in R3.
+    const { total, givenUp } = await getSyncQueueStats(db, MAX_ATTEMPTS);
+    if (total === 0) {
+      setSyncStatus("Up to date");
+    } else if (givenUp > 0) {
+      setSyncStatus(`${givenUp} rows gave up after ${MAX_ATTEMPTS} attempts — not synced`);
     } else {
-      // This error was previously discarded, which is why a column-name mismatch presented
-      // as an undiagnosable "Sync failed". The raw object always goes to Metro; the decoded
-      // Postgrest code is dev-only, since a code like PGRST204 is meaningless to a manager
-      // in a walk-in cooler.
-      console.warn("[sync] flush failed", result.error);
-      setSyncStatus(
-        __DEV__
-          ? `Sync failed — ${formatSyncError(result.error)}`
-          : "Sync failed — will retry"
-      );
+      setSyncStatus(`${total} rows still waiting`);
     }
 
     await refresh();

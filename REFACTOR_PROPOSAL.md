@@ -153,6 +153,12 @@ export async function syncNow(): Promise<void> {
     // the next poke (signal edge, Submit, manual button) simply tries again.
     // There is nothing to count and nothing to schedule.
     await flushSyncQueue(db, supabase);
+  } catch (error) {
+    // flush.ts returns push failures as values, so this only catches a throw from
+    // its own local db reads/writes. Every poke is fire-and-forget, so rethrowing
+    // would be an unhandled rejection nobody sees — warn instead. The queue is
+    // untouched either way; the next poke tries again.
+    console.warn("[sync] unexpected failure", error);
   } finally {
     status = "idle"; // ALWAYS comes back down, even if the push throws
   }
@@ -242,6 +248,8 @@ Production code contains zero test plumbing. The trickery lives in the test file
 4. `syncNow()` while offline does nothing
 5. `syncNow()` during an in-flight push doesn't double-run
 6. after cleanup, pokes do nothing
+7. an unexpected worker throw is swallowed (warned) and the engine returns to
+   idle — added in R2 with the catch branch (see §10)
 
 Queue behaviors stay covered where they live (`flush.test.ts`): failure leaves the
 queue intact; a later successful push drains it; idempotent re-runs.
@@ -292,6 +300,22 @@ TODO.md restructure (8b-iii dissolved), mirrored in TODO_PLAIN_ENGLISH.md.
   Fix folded into the plan: warn moves to `flush.ts`'s failure branch (the
   choke point), History keeps its `__DEV__` display. The comprehension gate
   found a real defect — the process works.
+- R2 planning finding (2026-07-28): the line above contradicts §5 — "History
+  keeps its `__DEV__` display" can't survive the swap, because the button now
+  calls `syncNow()`, which by design returns nothing. Owner decisions: (1) the
+  status line goes **console-only** — after a manual sync History derives
+  "Up to date / N waiting / gave up" from queue stats; `formatSyncError` stays
+  for the screen's own catch paths (load/reset/unexpected throw); (2) the
+  `flush.ts` failure-branch `console.warn` was pulled forward from R3 into R2
+  so no session ships with fully-silent flush failures.
+- R2 review finding (2026-07-28): `flushSyncQueue` can THROW past its own
+  error handling — `getPendingSyncQueue` and the success-path drain
+  transaction sit outside its try — and every poke is fire-and-forget, so
+  that rejection would be unhandled at all three call sites. Fix: `syncNow`
+  gains a catch branch (warn + swallow; the §5 code above is updated), which
+  finally makes "safe to call from anywhere, any time" literally true. Test
+  case 7 covers it. This is the residue of 8b-ii.5's waived W1, now resolved
+  at the engine rather than per call site.
 - OPEN: `attempts` column — drop via a small migration (cleaner) or leave dead
   in the schema (zero-risk)? Owner's call at build time.
 - OPEN: README known-limitations wording — merge the poison-batch note and the

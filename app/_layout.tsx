@@ -1,52 +1,25 @@
-import NetInfo from "@react-native-community/netinfo";
 import { Link, Stack } from "expo-router";
 import { SQLiteProvider, useSQLiteContext } from "expo-sqlite";
 import { useEffect } from "react";
 import { Text } from "react-native";
 import { migrate } from "../src/db";
 import { provision } from "../src/db/provision";
-import { supabase } from "../src/supabase";
-import { createAutoSync } from "../src/sync/autoSync";
-import { flushSyncQueue } from "../src/sync/flush";
-import { registerFlushRequester } from "../src/sync/requestFlush";
-import { createSyncScheduler } from "../src/sync/retry";
+import { startSyncEngine } from "../src/sync/syncEngine";
 
-// Renders nothing — it wires the sync engine's live triggers (7d/7e). Lives inside
-// SQLiteProvider so it can read the db handle; injects the real `supabase` singleton so the
-// worker stays singleton-free. The scheduler owns the in-flight guard + exponential-backoff
-// retries (setTimeout, tracked so pending retries are cancelled on unmount); createAutoSync
-// feeds it connectivity-regained edges (isConnected is boolean|null — only a definite,
-// reachable connection counts as online).
+// Renders nothing. Exists so the sync engine starts when the app mounts and stops
+// if it ever unmounts. Lives inside SQLiteProvider so it can grab the db handle.
 function AutoSync() {
   const db = useSQLiteContext();
+
   useEffect(() => {
-    const timers = new Set<ReturnType<typeof setTimeout>>();
-    const scheduler = createSyncScheduler({
-      flush: () => flushSyncQueue(db, supabase),
-      schedule: (fn, delayMs) => {
-        const id = setTimeout(() => {
-          timers.delete(id);
-          fn();
-        }, delayMs);
-        timers.add(id);
-      },
-    });
-    const auto = createAutoSync({ flush: () => scheduler.trigger() });
-    // Lets the review screen ask for a push right after completing an audit (8b-ii.5).
-    // The coordinator ignores the ask when offline, so no retry chances are spent in a
-    // dead zone — the connectivity-regained trigger below still covers that case.
-    registerFlushRequester(() => void auto.requestFlush());
-    const unsubscribe = NetInfo.addEventListener((state) => {
-      void auto.onConnectivityChange(
-        state.isConnected === true && state.isInternetReachable !== false
-      );
-    });
-    return () => {
-      registerFlushRequester(null);
-      unsubscribe();
-      timers.forEach(clearTimeout); // cancel pending backoff retries on unmount
-    };
+    // _ready(): start the engine. It hands back its own off switch.
+    const stopSyncEngine = startSyncEngine(db);
+
+    // Whatever a useEffect RETURNS, React stores and calls at teardown
+    // (_exit_tree()): on unmount, or before re-running if `db` ever changed.
+    return stopSyncEngine;
   }, [db]);
+
   return null;
 }
 

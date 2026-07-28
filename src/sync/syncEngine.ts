@@ -54,6 +54,12 @@ export async function syncNow(): Promise<void> {
     // the next poke (signal edge, Submit, manual button) simply tries again.
     // There is nothing to count and nothing to schedule.
     await flushSyncQueue(db, supabase);
+  } catch (error) {
+    // flush.ts returns push failures as values, so this only catches a throw from
+    // its own local db reads/writes. Every poke is fire-and-forget, so rethrowing
+    // would be an unhandled rejection nobody sees — warn instead. The queue is
+    // untouched either way; the next poke tries again.
+    console.warn("[sync] unexpected failure", error);
   } finally {
     status = "idle"; // ALWAYS comes back down, even if the push throws
   }

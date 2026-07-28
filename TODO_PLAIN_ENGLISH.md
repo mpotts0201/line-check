@@ -29,14 +29,16 @@ session.
   events poke it: the phone getting signal back, submitting an audit, and the
   Sync now button. Written and tested, but not plugged in yet; the app doesn't
   change this session.
-- **R2 — Swap it in.** Unplug the three old plumbing files, plug in the new one.
-  The app behaves the same, but the sync trigger is now one file you can read
-  top to bottom.
+- **R2 — Swap it in (done July 28).** Unplugged the three old plumbing files,
+  plugged in the new one. The sync trigger is now one file you can read top to
+  bottom. Two calls made along the way: sync failures now always print an error
+  in the console — before, some failed in total silence; pulled forward from R3
+  so that hole never shipped — and the History screen's detailed sync-result
+  text is gone. Its status line now just reads the waiting list ("Up to date"
+  or "N waiting"), because the new engine deliberately doesn't report results.
 - **R3 — Stop counting failures.** The retry counter and the "give up after 3
   tries" rule go away. A failed sync just stays on the waiting list and gets
-  tried again at the next natural moment. Failures also now always print an
-  error — before, some failed in total silence (the explain-it-out-loud gate is
-  what caught that).
+  tried again at the next natural moment.
 - **R4 — Simpler badges.** History cards say either "Synced ✓" or "Not synced —
   N waiting". There's no more "stuck" state, so the planned per-audit Retry
   button isn't needed — the regular Sync now button covers everything.
