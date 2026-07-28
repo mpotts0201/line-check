@@ -24,7 +24,7 @@ session.
 
 ## The rewrite, step by step
 
-- **R1 — Build the new brain on the bench.** One small file that decides when to
+- **R1 — Build the new brain on the bench (done July 28).** One small file that decides when to
   sync. It's only ever doing one of two things — idle or syncing — and three
   events poke it: the phone getting signal back, submitting an audit, and the
   Sync now button. Written and tested, but not plugged in yet; the app doesn't

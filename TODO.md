@@ -36,7 +36,7 @@ files, the worker (`flush.ts`) and the trigger (`syncEngine.ts`); old 8b-iii
 dissolves with the stuck state. **Every bullet below leaves the app tsc-clean and
 demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
 
-- [ ] **R1 — Engine, unwired.** Add `src/sync/syncEngine.ts` exactly as proposal
+- [x] **R1 — Engine, unwired.** (2026-07-28) Add `src/sync/syncEngine.ts` exactly as proposal
   §5, plus `syncEngine.test.ts` with §7's six cases: reconnect edge syncs exactly
   once; steady still-online events don't re-sync; offline events never sync;
   `syncNow()` while offline is a no-op; `syncNow()` during an in-flight push
