@@ -47,7 +47,12 @@ export default function ReviewSign() {
     // the audit is already durable in SQLite and the reconnect trigger covers it later.
     // Deliberately not awaited: navigation must never wait on the network.
     void syncNow();
-    router.replace("/history"); // to History; replace so the completed review isn't in the back stack
+    // To History — with the audit flow flattened out of the back stack. replace()
+    // alone swapped only THIS screen, leaving Line Check underneath, so back from
+    // History reopened the completed audit's checklist. dismissAll pops to the
+    // stack root (Locations), then the push makes back from History → Locations.
+    router.dismissAll();
+    router.push("/history");
   }
 
   return (
