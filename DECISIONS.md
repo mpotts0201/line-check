@@ -482,3 +482,60 @@ doorbell, not a filing cabinet.
 **Parked with 8b-iv (not forgotten):** the Sync now button reading `status` from the store
 (background flushes would show "Syncing…" and disable the buttons — a semantics change that
 belongs with the SyncBar extraction), and `isOnline` in the store for an offline indicator.
+
+## 2026-07-29 — History screen split: SyncBar + AuditCard out of the route file (8b-iv)
+
+**Working document:** `HISTORY_SCREEN_REFACTOR_PROPOSAL.md` (proposal reviewed and both
+parked decisions resolved 2026-07-29, built same day).
+
+**Decision:** `app/history/index.tsx` (316 lines — flagged in the 2026-07-29 line-count
+audit) splits into
+the screen (~105 lines: two queries, two refresh effects, the FlatList) plus
+`src/components/history/SyncBar.tsx` (sync button, status line, dev reset),
+`src/components/history/AuditCard.tsx` (card + badge helpers), and
+`src/sync/formatSyncError.ts` (pure error→string, now unit-tested). Components live in
+`src/components/history/`, NOT `app/history/` as the original ticket wording said — any
+file under `app/` becomes an expo-router route, and `/history/SyncBar` should not be a
+navigable path. Named for the screen they serve; precedent `src/components/ScreenWrapper.tsx`.
+
+**Sub-decisions (parked from SYNC_STATUS_FIX §9 to "8b-iv ticket time", resolved now):**
+- **The button's `syncing` reads the store's `status`** (`useSyncStore((s) => s.status ===
+  "syncing")`); local tap-state deleted. Any flush — manual, reconnect edge, completion
+  poke — shows "Syncing…" and disables both buttons. Deciding factor: the Reset disable is
+  flush-safety (wiping `sync_queue` mid-upsert pushes rows for locally-deleted audits), and
+  local tap-state only covered manual flushes — a background reconnect flush left Reset
+  tappable during exactly the window the disable exists for. Accepted tradeoff: an
+  unprompted "Syncing…" blink on reconnect.
+- **`runSync()`'s trailing `refresh()` dropped.** The engine's `flushCount` bump already
+  triggers the screen's re-read, so the explicit call was a second delivery of the same
+  message. Checked before dropping: a guarded no-op poke (offline/busy) doesn't bump the
+  counter, but it also changes nothing in SQLite — nothing to re-read — and the status
+  message still comes from `getSyncQueueStats`. Flush results now reach the badges through
+  exactly one channel (the signal); SyncBar's `onDataChanged` prop fires only after dev
+  reset, which is not a flush and must ask for its re-read explicitly.
+
+**Also recorded here per the ticket:** per-audit sync state is a SEPARATE query
+(`getAuditSyncStates`), merged with `getCompletedAudits` by audit id in the screen — joining
+`sync_queue` into the summaries query would fan out the GROUP BY that builds the
+pass/fail/na counts. (The old entry's other half — per-audit vs global retry — dissolved
+with the retry removal.)
+
+**Behavior changes shipped with the split (beyond the two above):**
+- Load failures render as the screen's own error line under the header, styled as an error,
+  instead of writing into the sync bar's status text. "Did the read work" and "did the push
+  land" are different questions; a load error is no longer overwritten by tapping Sync now,
+  and a successful read now retires a stale one.
+- The Sync now button and each audit card gained `accessibilityRole`/`accessibilityLabel`
+  (standards gap; the reset button already had them).
+
+**Alternatives considered:**
+- **Co-locate components in `app/history/` per the ticket's wording** — rejected: route
+  pollution + typed-routes codegen churn for files that are not screens.
+- **SyncBar as a dumb component (props: syncing, status, three callbacks)** — rejected:
+  five-prop plumbing to move state one level up for no reader's benefit; the bar owns its
+  own concern end-to-end and the parent's contract is one named callback.
+- **Threading the screen's load error down into SyncBar's status line** (status quo
+  behavior) — rejected: exactly the multi-owner state the split exists to remove.
+
+**Still parked:** `isOnline` in the store for an offline indicator (new surface, not
+cleanup); the shared theme/constants file (`BADGE_COLOR` stays in AuditCard).

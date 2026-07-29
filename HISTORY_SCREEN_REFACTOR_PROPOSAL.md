@@ -184,27 +184,34 @@ after dev reset.
 
 Each step compiles and ships alone; the screen works after every one.
 
-- [ ] **Step 1 — `formatSyncError` extraction + tests.** Create
+> **Execution note (2026-07-29):** owner approved running all four steps in one
+> session (explicit deviation from one-step-per-session), with review + device
+> test before any commit. Tests are co-located as `src/sync/formatSyncError.test.ts`
+> per repo convention, not `__tests__/` as written below.
+
+- [x] **Step 1 — `formatSyncError` extraction + tests.** Create
   `src/sync/formatSyncError.ts` (verbatim move, named export), point
   index.tsx's import at it, delete the in-file copy. Add
   `src/sync/__tests__/formatSyncError.test.ts`: Error instance, empty-message
   Error, Postgrest shape (all four fields / partial fields), numeric-code
   object → JSON, circular object → String fallback, plain string/number.
   Gate: tsc clean; human runs jest on Windows.
-- [ ] **Step 2 — `AuditCard` extraction.** Create
+- [x] **Step 2 — `AuditCard` extraction.** Create
   `src/components/history/AuditCard.tsx` per §3b; index.tsx's `renderItem`
   becomes a `useCallback` returning `<AuditCard/>`. Zero behavior change.
   Gate: tsc clean; visual check on device (cards + badges identical).
-- [ ] **Step 3 — `SyncBar` extraction.** Create
+- [x] **Step 3 — `SyncBar` extraction.** Create
   `src/components/history/SyncBar.tsx` per §3c, apply the Q1/Q2 answers,
   move the load-error display per §3d, add the missing accessibility props.
   Gate: tsc clean; device pass — manual sync, dev reset, airplane-mode
-  reconnect (badge still flips with no tap, per SYNC_STATUS_FIX §8).
-- [ ] **Step 4 — close-out.** DECISIONS.md entry (the ticket's required note:
+  reconnect (badge still flips with no tap, per SYNC_STATUS_FIX §8) — device
+  pass PENDING owner test.
+- [x] **Step 4 — close-out.** DECISIONS.md entry (the ticket's required note:
   sync state is a separate query, not a join — GROUP BY fanout — plus the Q1/Q2
   outcomes and the `src/` vs `app/` placement call). Check off 8b-iv in place
-  in TODO.md. Update LINE_AUDIT.md counts. Run the code-reviewer agent across
-  the accumulated diff before the final commit if not already done per-step.
+  in TODO.md. ~~Update LINE_AUDIT.md counts~~ (owner removed LINE_AUDIT.md
+  during proposal review; final counts recorded in §7 instead). Run the
+  code-reviewer agent across the accumulated diff before the final commit.
 
 Each step ends with the code-reviewer agent before its commit (CLAUDE.md
 rule), and Windows eslint for each commit joins the standing carry-over sweep
@@ -212,12 +219,13 @@ in TODO.md.
 
 ## 7. Expected outcome
 
-| File | Before | After (est.) |
+| File | Before | After (actual, 2026-07-29) |
 | --- | --- | --- |
-| app/history/index.tsx | 316 | ~120 |
-| src/components/history/SyncBar.tsx | — | ~130 |
-| src/components/history/AuditCard.tsx | — | ~100 |
-| src/sync/formatSyncError.ts | — | ~35 |
+| app/history/index.tsx | 316 | 106 |
+| src/components/history/SyncBar.tsx | — | 147 |
+| src/components/history/AuditCard.tsx | — | 114 |
+| src/sync/formatSyncError.ts | — | 26 |
+| src/sync/formatSyncError.test.ts | — | 55 |
 
 Every file under the 200-line guideline, one component per file, and the
 screen file reads as: state → refresh → two effects → FlatList. The sync bar

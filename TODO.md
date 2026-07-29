@@ -117,7 +117,7 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
   reconnect → badge flips with no tap).
 
 ### 8b-iv — History cleanup (after R4; shrunken)
-- [ ] Extract `formatSyncError` + the (post-R4, much smaller) sync header into a
+- [x] (2026-07-29) Extract `formatSyncError` + the (post-R4, much smaller) sync header into a
   co-located `app/history/SyncBar.tsx` — the screen passed the ~200-line guideline
   on 2026-07-21. DECISIONS entry: sync state is a separate query, not a join
   (GROUP BY fanout). The old entry's other half (per-audit vs global retry)
@@ -125,6 +125,15 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
   ticket time): the button's `syncing` state could read the store's `status`
   so background flushes show "Syncing…" too, and `runSync()`'s now-redundant
   `refresh()` can go.
+  - Built per `HISTORY_SCREEN_REFACTOR_PROPOSAL.md` (owner-reviewed same day).
+    Components landed in `src/components/history/` (SyncBar + AuditCard), NOT
+    `app/history/` — a file under `app/` becomes a route (deviation flagged in
+    proposal §2). `formatSyncError` → `src/sync/` + 7-case logic test. Both
+    parked decisions taken: button reads store `status` (closes the
+    Reset-tappable-during-background-flush gap); trailing `refresh()` dropped
+    (flushCount signal is the only badge channel). DECISIONS 2026-07-29 entry
+    written. AC pending: jest on Windows, §3 device pass (manual sync, reset,
+    airplane-mode reconnect badge flip).
 
 ### Send-out essentials (was T9 — deadline scope)
 - [ ] README: demo GIF, architecture diagram, link DECISIONS.md, note the test
