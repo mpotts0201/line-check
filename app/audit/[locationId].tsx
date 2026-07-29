@@ -2,7 +2,9 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
 import { useCallback, useState } from "react";
 import { Pressable, SectionList, StyleSheet, Text, View } from "react-native";
+import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { getAuditItems, getOrCreateTodaysAudit, type AuditItem } from "../../src/db/audits";
+import { color, font, radius } from "../../src/theme";
 
 export default function Checklist() {
   const { locationId } = useLocalSearchParams<{ locationId: string }>();
@@ -44,18 +46,23 @@ export default function Checklist() {
             onPress={() => router.push(`/audit/item/${item.id}`)}
           >
             <Text style={styles.label}>{item.label}</Text>
-            <Text style={[styles.status, item.result === "fail" && styles.fail]}>
+            <Text style={[styles.status, item.result && STATUS_STYLE[item.result]]}>
               {item.result ? item.result.toUpperCase() : "—"}
             </Text>
           </Pressable>
         )}
       />
-      <Pressable
-        style={styles.reviewBtn}
-        onPress={() => auditId && router.push(`/audit/review/${auditId}`)}
-      >
-        <Text style={styles.reviewText}>Review & Complete</Text>
-      </Pressable>
+      <View style={styles.reviewWrap}>
+        <PrimaryButton
+          label="Review & Complete"
+          // Disabled for the brief pre-load window where auditId is still null —
+          // the old Pressable silently swallowed taps during it.
+          disabled={!auditId}
+          onPress={() => {
+            if (auditId) router.push(`/audit/review/${auditId}`);
+          }}
+        />
+      </View>
     </View>
   );
 }
@@ -64,21 +71,26 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   list: { padding: 16, paddingBottom: 96 },
   station: {
-    fontSize: 13, fontWeight: "700", color: "#888",
+    fontSize: font.secondary, fontWeight: "700", color: color.label,
     textTransform: "uppercase", marginTop: 16, marginBottom: 6,
   },
   row: {
-    backgroundColor: "#fff", borderRadius: 12, padding: 16, marginBottom: 8,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: "#ddd",
+    backgroundColor: color.card, borderRadius: radius.card, padding: 16, marginBottom: 8,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: color.border,
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
   },
   pressed: { opacity: 0.6 },
-  label: { fontSize: 15 },
-  status: { fontSize: 13, fontWeight: "700", color: "#999" },
-  fail: { color: "#c0392b" },
-  reviewBtn: {
-    position: "absolute", bottom: 24, left: 16, right: 16,
-    backgroundColor: "#1a1a1a", borderRadius: 12, padding: 16, alignItems: "center",
-  },
-  reviewText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  label: { fontSize: font.body },
+  status: { fontSize: font.secondary, fontWeight: "700", color: color.muted },
+  statusPass: { color: color.success },
+  statusFail: { color: color.danger },
+  statusNa: { color: color.neutral },
+  reviewWrap: { position: "absolute", bottom: 24, left: 16, right: 16 },
 });
+
+// Answered rows read in their semantic color; the unanswered "—" stays muted.
+const STATUS_STYLE = {
+  pass: styles.statusPass,
+  fail: styles.statusFail,
+  na: styles.statusNa,
+} as const;

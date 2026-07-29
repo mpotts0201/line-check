@@ -6,6 +6,8 @@ import { getSyncQueueStats } from "../../db/syncQueue";
 import { formatSyncError } from "../../sync/formatSyncError";
 import { syncNow } from "../../sync/syncEngine";
 import { useSyncStore } from "../../sync/syncStore";
+import { color, font, radius } from "../../theme";
+import { PrimaryButton } from "../PrimaryButton";
 
 type SyncBarProps = {
   // Parent re-reads audits + sync states after an action that changed local data
@@ -87,19 +89,11 @@ export function SyncBar({ onDataChanged }: SyncBarProps) {
 
   return (
     <View style={styles.syncBar}>
-      <Pressable
-        style={({ pressed }) => [
-          styles.syncBtn,
-          isSyncing && styles.syncBtnDisabled,
-          pressed && styles.pressed,
-        ]}
+      <PrimaryButton
+        label={isSyncing ? "Syncing…" : "Sync now"}
         onPress={onSyncNow}
         disabled={isSyncing}
-        accessibilityRole="button"
-        accessibilityLabel="Sync now"
-      >
-        <Text style={styles.syncBtnText}>{isSyncing ? "Syncing…" : "Sync now"}</Text>
-      </Pressable>
+      />
       {statusMessage && <Text style={styles.statusText}>{statusMessage}</Text>}
       {/* Dev/demo only. __DEV__ is false in a production bundle, so Metro drops this
           branch and the CONTROL never renders in production. Note the capability itself
@@ -130,25 +124,17 @@ export function SyncBar({ onDataChanged }: SyncBarProps) {
 
 const styles = StyleSheet.create({
   syncBar: { gap: 6, marginBottom: 4 },
-  syncBtn: {
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  syncBtnDisabled: { backgroundColor: "#999" },
-  syncBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
-  statusText: { fontSize: 13, color: "#666", textAlign: "center" },
+  statusText: { fontSize: font.secondary, color: color.text, textAlign: "center" },
   resetBtn: {
     minHeight: 44, // tap-target floor
-    borderRadius: 12,
+    borderRadius: radius.card,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#c0392b",
+    borderColor: color.danger,
     alignItems: "center",
     justifyContent: "center",
   },
-  resetBtnDisabled: { borderColor: "#ccc" },
-  resetBtnText: { color: "#c0392b", fontSize: 14, fontWeight: "600" },
-  resetBtnTextDisabled: { color: "#ccc" },
+  resetBtnDisabled: { borderColor: color.disabled },
+  resetBtnText: { color: color.danger, fontSize: font.note, fontWeight: "600" },
+  resetBtnTextDisabled: { color: color.disabled },
   pressed: { opacity: 0.6 },
 });

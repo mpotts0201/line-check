@@ -3,6 +3,7 @@ import { useSQLiteContext } from "expo-sqlite";
 import { useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text } from "react-native";
 import { getLocations, type Location } from "../src/db/locations";
+import { color, font, radius } from "../src/theme";
 
 
 export default function Locations() {
@@ -35,13 +36,13 @@ export default function Locations() {
 const styles = StyleSheet.create({
   list: { padding: 16, gap: 10 },
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
+    backgroundColor: color.card,
+    borderRadius: radius.card,
     padding: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ddd",
+    borderColor: color.border,
   },
   pressed: { opacity: 0.6 },
-  name: { fontSize: 16, fontWeight: "600" },
-  address: { fontSize: 13, color: "#666", marginTop: 2 },
+  name: { fontSize: font.emphasis, fontWeight: "600" },
+  address: { fontSize: font.secondary, color: color.text, marginTop: 2 },
 });

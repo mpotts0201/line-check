@@ -1,10 +1,11 @@
 import { Link, Stack } from "expo-router";
 import { SQLiteProvider, useSQLiteContext } from "expo-sqlite";
 import { useEffect } from "react";
-import { Text } from "react-native";
+import { StyleSheet, Text } from "react-native";
 import { migrate } from "../src/db";
 import { provision } from "../src/db/provision";
 import { startSyncEngine } from "../src/sync/syncEngine";
+import { color, font } from "../src/theme";
 
 // Renders nothing. Exists so the sync engine starts when the app mounts and stops
 // if it ever unmounts. Lives inside SQLiteProvider so it can grab the db handle.
@@ -33,16 +34,20 @@ export default function RootLayout() {
       }}
     >
       <AutoSync />
-      <Stack>
+      <Stack
+        screenOptions={{
+          contentStyle: styles.screen,
+          headerTintColor: color.brand,
+          headerTitleStyle: styles.headerTitle,
+        }}
+      >
         <Stack.Screen
           name="index"
           options={{
             title: "Locations",
             headerRight: () => (
               <Link href="/history">
-                <Text style={{ fontSize: 16, color: "#1a1a1a", fontWeight: "600" }}>
-                  History
-                </Text>
+                <Text style={styles.headerLink}>History</Text>
               </Link>
             ),
           }}
@@ -56,3 +61,9 @@ export default function RootLayout() {
     </SQLiteProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { backgroundColor: color.screen },
+  headerTitle: { fontWeight: "600" },
+  headerLink: { fontSize: font.emphasis, color: color.brand, fontWeight: "600" },
+});

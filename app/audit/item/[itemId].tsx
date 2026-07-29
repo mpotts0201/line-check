@@ -9,7 +9,9 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { PrimaryButton } from "../../../src/components/PrimaryButton";
 import { getAuditItem, updateAuditItem, type AuditItem } from "../../../src/db/audits";
+import { color, font, radius } from "../../../src/theme";
 import { itemSaveSchema } from "../../../src/validation/audit";
 
 const RESULTS = ["pass", "fail", "na"] as const;
@@ -86,11 +88,7 @@ export default function CheckItem() {
                 setResult(value);
                 setError(null);
               }}
-              style={[
-                styles.segmentBtn,
-                selected && styles.segmentSelected,
-                selected && value === "fail" && styles.segmentFail,
-              ]}
+              style={[styles.segmentBtn, selected && SELECTED_STYLE[value]]}
             >
               <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>
                 {RESULT_LABELS[value]}
@@ -112,7 +110,7 @@ export default function CheckItem() {
             }}
             keyboardType="numeric"
             placeholder="e.g. 38"
-            placeholderTextColor="#999"
+            placeholderTextColor={color.muted}
           />
         </View>
       )}
@@ -124,61 +122,61 @@ export default function CheckItem() {
           value={note}
           onChangeText={setNote}
           placeholder="Optional"
-          placeholderTextColor="#999"
+          placeholderTextColor={color.muted}
           multiline
         />
       </View>
 
       {error && <Text style={styles.error}>{error}</Text>}
 
-      <Pressable style={styles.saveBtn} onPress={onSave}>
-        <Text style={styles.saveText}>Save</Text>
-      </Pressable>
+      <PrimaryButton label="Save" onPress={onSave} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { padding: 16 },
-  loading: { fontSize: 15, color: "#999" },
-  heading: { fontSize: 20, fontWeight: "700", marginBottom: 20 },
+  loading: { fontSize: font.body, color: color.muted },
+  heading: { fontSize: font.title, fontWeight: "700", marginBottom: 20 },
   segment: { flexDirection: "row", gap: 8, marginBottom: 20 },
   segmentBtn: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: radius.card,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ddd",
-    backgroundColor: "#fff",
+    borderColor: color.border,
+    backgroundColor: color.card,
     alignItems: "center",
   },
-  segmentSelected: { backgroundColor: "#1a1a1a", borderColor: "#1a1a1a" },
-  segmentFail: { backgroundColor: "#c0392b", borderColor: "#c0392b" },
-  segmentText: { fontSize: 15, fontWeight: "600", color: "#666" },
-  segmentTextSelected: { color: "#fff" },
+  segmentPass: { backgroundColor: color.success, borderColor: color.success },
+  segmentFail: { backgroundColor: color.danger, borderColor: color.danger },
+  segmentNa: { backgroundColor: color.neutral, borderColor: color.neutral },
+  segmentText: { fontSize: font.body, fontWeight: "600", color: color.text },
+  segmentTextSelected: { color: color.onFill },
   field: { marginBottom: 20 },
   fieldLabel: {
-    fontSize: 13,
+    fontSize: font.secondary,
     fontWeight: "700",
-    color: "#888",
+    color: color.label,
     textTransform: "uppercase",
     marginBottom: 6,
   },
   input: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
+    backgroundColor: color.card,
+    borderRadius: radius.card,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ddd",
+    borderColor: color.border,
     padding: 14,
-    fontSize: 15,
+    fontSize: font.body,
   },
   multiline: { minHeight: 88, textAlignVertical: "top" },
-  error: { color: "#c0392b", fontSize: 14, marginBottom: 12 },
-  saveBtn: {
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-  },
-  saveText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  error: { color: color.danger, fontSize: font.note, marginBottom: 12 },
 });
+
+// The selected segment fills with its result's semantic color (white text) —
+// pass/fail/na each read distinctly at a glance, not just fail.
+const SELECTED_STYLE = {
+  pass: styles.segmentPass,
+  fail: styles.segmentFail,
+  na: styles.segmentNa,
+} as const;

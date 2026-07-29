@@ -1,9 +1,12 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { PrimaryButton } from "../../../src/components/PrimaryButton";
+import { StatTile } from "../../../src/components/StatTile";
 import { getAuditItems, completeAudit, type AuditItem } from "../../../src/db/audits";
 import { syncNow } from "../../../src/sync/syncEngine";
+import { color, font, radius } from "../../../src/theme";
 import { auditCompleteSchema } from "../../../src/validation/audit";
 
 export default function ReviewSign() {
@@ -58,10 +61,10 @@ export default function ReviewSign() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.countsRow}>
-        <Count label="Pass" value={counts.pass} />
-        <Count label="Fail" value={counts.fail} tint="#c0392b" />
-        <Count label="N/A" value={counts.na} />
-        <Count label="Open" value={counts.unanswered} />
+        <StatTile label="Pass" value={counts.pass} />
+        <StatTile label="Fail" value={counts.fail} tint={color.danger} />
+        <StatTile label="N/A" value={counts.na} />
+        <StatTile label="Open" value={counts.unanswered} />
       </View>
 
       <Text style={styles.sectionLabel}>Failed Items</Text>
@@ -87,93 +90,45 @@ export default function ReviewSign() {
         </Text>
       )}
 
-      <Pressable
-        style={[styles.completeBtn, !canComplete && styles.completeBtnDisabled]}
-        onPress={onComplete}
-        disabled={!canComplete}
-      >
-        <Text style={styles.completeText}>Complete Audit</Text>
-      </Pressable>
+      <PrimaryButton label="Complete Audit" onPress={onComplete} disabled={!canComplete} />
     </ScrollView>
-  );
-}
-
-function Count({
-  label,
-  value,
-  tint,
-}: {
-  label: string;
-  value: number;
-  tint?: string;
-}) {
-  return (
-    <View style={styles.count}>
-      <Text style={[styles.countValue, tint ? { color: tint } : null]}>{value}</Text>
-      <Text style={styles.countLabel}>{label}</Text>
-    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { padding: 16 },
   countsRow: { flexDirection: "row", gap: 8, marginBottom: 24 },
-  count: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ddd",
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  countValue: { fontSize: 22, fontWeight: "700", color: "#1a1a1a" },
-  countLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#888",
-    textTransform: "uppercase",
-    marginTop: 4,
-  },
   sectionLabel: {
-    fontSize: 13,
+    fontSize: font.secondary,
     fontWeight: "700",
-    color: "#888",
+    color: color.label,
     textTransform: "uppercase",
     marginBottom: 8,
   },
-  empty: { fontSize: 15, color: "#999", marginBottom: 24 },
+  empty: { fontSize: font.body, color: color.muted, marginBottom: 24 },
   failCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
+    backgroundColor: color.card,
+    borderRadius: radius.card,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ddd",
+    borderColor: color.border,
     borderLeftWidth: 3,
-    borderLeftColor: "#c0392b",
+    borderLeftColor: color.danger,
     padding: 14,
     marginBottom: 8,
   },
-  failLabel: { fontSize: 15, fontWeight: "600" },
-  failNote: { fontSize: 14, color: "#666", marginTop: 4 },
+  failLabel: { fontSize: font.body, fontWeight: "600" },
+  failNote: { fontSize: font.note, color: color.text, marginTop: 4 },
   signatureBox: {
     height: 120,
-    borderRadius: 12,
+    borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: color.disabled,
     borderStyle: "dashed",
     alignItems: "center",
     justifyContent: "center",
     marginTop: 8,
     marginBottom: 24,
   },
-  signaturePlaceholder: { fontSize: 14, color: "#999" },
-  hint: { fontSize: 14, color: "#c0392b", marginBottom: 12, textAlign: "center" },
-  completeBtn: {
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-  },
-  completeBtnDisabled: { backgroundColor: "#ccc" },
-  completeText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  signaturePlaceholder: { fontSize: font.note, color: color.muted },
+  hint: { fontSize: font.note, color: color.danger, marginBottom: 12, textAlign: "center" },
 });

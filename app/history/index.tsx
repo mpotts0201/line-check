@@ -11,6 +11,7 @@ import {
 } from "../../src/db/syncQueue";
 import { formatSyncError } from "../../src/sync/formatSyncError";
 import { useSyncStore } from "../../src/sync/syncStore";
+import { color, font } from "../../src/theme";
 
 // The History screen: load completed audits + their sync states, render the
 // list. The sync controls live in SyncBar; a card is AuditCard.
@@ -101,6 +102,6 @@ export default function History() {
 
 const styles = StyleSheet.create({
   list: { padding: 16, gap: 10 },
-  empty: { fontSize: 15, color: "#999", padding: 16 },
-  loadError: { fontSize: 13, color: "#c0392b", textAlign: "center" },
+  empty: { fontSize: font.body, color: color.muted, padding: 16 },
+  loadError: { fontSize: font.secondary, color: color.danger, textAlign: "center" },
 });

@@ -2,12 +2,14 @@ import { useLocalSearchParams } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
 import { useEffect, useState } from "react";
 import { SectionList, StyleSheet, Text, View } from "react-native";
+import { StatTile } from "../../src/components/StatTile";
 import {
   getAudit,
   getAuditItems,
   type Audit,
   type AuditItem,
 } from "../../src/db/audits";
+import { color, font, radius } from "../../src/theme";
 
 // completedAt is an ISO string; show its date portion. Manual slice (no date lib, no
 // Hermes Intl reliance) — same rationale as the History list's formatter.
@@ -63,9 +65,9 @@ export default function AuditDetail() {
           <Text style={styles.location}>{audit.locationName}</Text>
           <Text style={styles.completed}>Completed {formatDate(audit.completedAt)}</Text>
           <View style={styles.countsRow}>
-            <Count label="Pass" value={counts.pass} />
-            <Count label="Fail" value={counts.fail} tint="#c0392b" />
-            <Count label="N/A" value={counts.na} />
+            <StatTile label="Pass" value={counts.pass} />
+            <StatTile label="Fail" value={counts.fail} tint={color.danger} />
+            <StatTile label="N/A" value={counts.na} />
           </View>
         </View>
       }
@@ -76,7 +78,7 @@ export default function AuditDetail() {
         <View style={styles.row}>
           <View style={styles.rowHeader}>
             <Text style={styles.label}>{item.label}</Text>
-            <Text style={[styles.result, item.result === "fail" && styles.fail]}>
+            <Text style={[styles.result, item.result && STATUS_STYLE[item.result]]}>
               {item.result ? item.result.toUpperCase() : "—"}
             </Text>
           </View>
@@ -90,71 +92,47 @@ export default function AuditDetail() {
   );
 }
 
-function Count({
-  label,
-  value,
-  tint,
-}: {
-  label: string;
-  value: number;
-  tint?: string;
-}) {
-  return (
-    <View style={styles.count}>
-      <Text style={[styles.countValue, tint ? { color: tint } : null]}>{value}</Text>
-      <Text style={styles.countLabel}>{label}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   loadingContainer: { flex: 1, padding: 16 },
-  loading: { fontSize: 15, color: "#999" },
+  loading: { fontSize: font.body, color: color.muted },
   list: { padding: 16, paddingBottom: 32 },
   header: { marginBottom: 8 },
-  location: { fontSize: 20, fontWeight: "700" },
-  completed: { fontSize: 13, color: "#666", marginTop: 2 },
+  location: { fontSize: font.title, fontWeight: "700" },
+  completed: { fontSize: font.secondary, color: color.text, marginTop: 2 },
   countsRow: { flexDirection: "row", gap: 8, marginTop: 16 },
-  count: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ddd",
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  countValue: { fontSize: 22, fontWeight: "700", color: "#1a1a1a" },
-  countLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#888",
-    textTransform: "uppercase",
-    marginTop: 4,
-  },
   station: {
-    fontSize: 13,
+    fontSize: font.secondary,
     fontWeight: "700",
-    color: "#888",
+    color: color.label,
     textTransform: "uppercase",
     marginTop: 16,
     marginBottom: 6,
   },
   row: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
+    backgroundColor: color.card,
+    borderRadius: radius.card,
     padding: 16,
     marginBottom: 8,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ddd",
+    borderColor: color.border,
   },
   rowHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  label: { fontSize: 15, flexShrink: 1, paddingRight: 8 },
-  result: { fontSize: 13, fontWeight: "700", color: "#999" },
-  fail: { color: "#c0392b" },
-  meta: { fontSize: 14, color: "#666", marginTop: 6 },
+  label: { fontSize: font.body, flexShrink: 1, paddingRight: 8 },
+  result: { fontSize: font.secondary, fontWeight: "700", color: color.muted },
+  resultPass: { color: color.success },
+  resultFail: { color: color.danger },
+  resultNa: { color: color.neutral },
+  meta: { fontSize: font.note, color: color.text, marginTop: 6 },
 });
+
+// Same semantic coloring as the checklist's status column — a completed audit's
+// PASS/FAIL/NA read in their result colors, not one undifferentiated gray.
+const STATUS_STYLE = {
+  pass: styles.resultPass,
+  fail: styles.resultFail,
+  na: styles.resultNa,
+} as const;

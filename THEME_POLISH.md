@@ -1,9 +1,8 @@
 # THEME_POLISH — LineCheck visual pass (Tier 1)
 
-Status: **PROPOSAL — gated.** No styling code lands until the owner reads this,
-pushes back, and passes it the same way REFACTOR_PROPOSAL.md and
-SYNC_STATUS_FIX.md were passed. After the gate, the P-tickets in §5 are copied
-into TODO.md and run one bullet per session as usual.
+Status: **GATE PASSED 2026-07-29** (owner answered §7 same day — answers and
+build log in §8). P1–P4 built 2026-07-29 in one owner-approved session; P5
+deferred to a reconvene; P6 stays parked with the Reanimated bullet.
 
 Scope guard: this is **cosmetics and consolidation only** — colors, spacing,
 shared style primitives. Zero behavior changes, zero navigation changes. The
@@ -218,3 +217,59 @@ deadline without hurting the demo.
 3. `color.screen` #F2F2F7 background — want it, or keep white-on-white?
 4. P5 StatTile: worth a session, or leave the three copies until they next
    change for another reason?
+
+## 8. Gate answers + build log (2026-07-29)
+
+**Owner's §7 answers:** (1) `#1565C0` approved. (2) Keep both grays. (3) Yes —
+gray background, explicitly for eye strain and contrast. (4) StatTile is worth
+doing, but as its own reconvened session — P1–P4 built now, P5 next time.
+
+**Deviations found and taken during the build** (each surfaced by the code
+census, none changes the design's intent):
+
+- **Tokens gained three entries** §2 didn't have: `font.emphasis: 16` (card
+  titles, header link) and `font.note: 14` (notes, error/status lines) — both
+  sizes existed in the code but not in the proposal's scale — and
+  `color.onFill: #FFFFFF` for text on brand/semantic fills (same value as
+  `card`, deliberately distinct meaning).
+- **AuditCard's compact tile keeps literal 18/11 font sizes.** §2's note said
+  `stat`/`caption` collapse them, but P1's zero-diff rule wins: the collapse
+  happens when P5's StatTile unifies the three copies, not silently in the
+  sweep.
+- **P4 also covers the history detail screen.** Its result column had the
+  identical gray-PASS bug as the checklist (same read-only rendering); fixing
+  one without the other would leave the same record colored on one screen and
+  gray on another.
+- **P3's "four style-identical call sites" was three.** SyncBar's button was
+  shorter (paddingVertical 12 vs 16), bolder (700 vs 600), and used #999 for
+  its disabled fill instead of #ccc. Unifying on PrimaryButton makes it match
+  the other three — a small deliberate visual change, accepted as the point
+  of the primitive. Its accessibility label now tracks the visible label
+  ("Syncing…" while in flight), which is more truthful than the old static
+  "Sync now".
+- **PrimaryButton adds pressed-opacity feedback** the three inline buttons
+  never had (SyncBar's had it; the standards require it everywhere).
+- **Spacing tokens shipped but mostly unadopted.** The real spacing values
+  (2, 6, 10, 14, 20…) sit between the scale's stops; snapping them is a
+  visible change, so P1 left every literal in place. `space` exists for new
+  code and for a future deliberate normalization pass.
+- **Header back-buttons tint brand blue** (`headerTintColor`) — P2 said
+  "header accent"; this is that, made concrete.
+
+**P5 build (2026-07-29, after owner approved P1–P4 on device):**
+
+- `src/components/StatTile.tsx` (named export; `label`, `value`, `tint?`)
+  replaces all three Count copies — the cleanup DECISIONS 2026-07-17 deferred.
+- **Unified on the bordered white tile, no size variant.** The review and
+  history-detail copies were identical (bordered, `font.stat`/`font.caption`);
+  AuditCard's was a hand-rolled compact variant (subtle-gray fill, 10 radius,
+  18/11 text). Rather than encode that fork as a `compact` prop, the History
+  card adopts the standard tile — one component, one look, and the card's
+  counts (its main content) get bigger, not smaller. Visible change: History
+  cards grow ~14pt taller with bordered tiles.
+- **Two tokens died with the compact tile and were removed**: `color.subtle`
+  and `radius.tile` existed only for it. A token whose comment describes
+  nothing in the app is drift waiting to happen; re-add them if a real use
+  arrives.
+- StatTile is new code, so it uses `space` tokens (`space.lg` padding,
+  `space.xs` label gap) — first adoption beyond PrimaryButton.

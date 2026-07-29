@@ -135,13 +135,43 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
     written. AC pending: jest on Windows, §3 device pass (manual sync, reset,
     airplane-mode reconnect badge flip).
 
-### P — Theme polish (proposal 2026-07-29 — governing doc: THEME_POLISH.md, GATED)
-- [ ] Owner reads THEME_POLISH.md and answers its §7 open questions (brand blue
-  value, gray merge, screen background, StatTile worth-it). Same process as
-  REFACTOR_PROPOSAL/SYNC_STATUS_FIX: **no styling code before the gate passes.**
-  After the gate, copy its P1–P5 tickets here as bullets (P6 motion is already
-  parked below under Reanimated). Tier 2 (one-tap fast path) was REJECTED —
-  DECISIONS 2026-07-29 — and does not become a ticket.
+### P — Theme polish (governing doc: THEME_POLISH.md — gate PASSED 2026-07-29)
+- [x] (2026-07-29) Owner answered §7: blue #1565C0 approved; keep both grays;
+  gray screen background yes (eye strain/contrast); StatTile worth doing but
+  at a reconvene. Answers + build deviations logged in THEME_POLISH §8.
+  Tier 2 (one-tap fast path) REJECTED — DECISIONS 2026-07-29, not a ticket.
+- [x] **P1 — Tokens, zero visual diff.** (2026-07-29, P1–P4 run in ONE
+  owner-approved session — same deviation grant as 8b-iv.) `src/theme.ts`
+  added (§2 + three census additions: `font.emphasis` 16, `font.note` 14,
+  `color.onFill`); all nine styled files swept — hex, radius, font sizes.
+  AuditCard's 18/11 tile sizes stay literal until P5 (zero-diff rule).
+  Spacing literals untouched (off-scale values; normalization is a future
+  deliberate change). Grep-verified: no `"#` outside theme.ts.
+- [x] **P2 — Screen chrome.** (2026-07-29) Stack `contentStyle` → gray
+  `color.screen` everywhere; `headerTintColor` brand; header titles 600;
+  History header link off inline-style onto StyleSheet in brand blue.
+- [x] **P3 — Actions go brand.** (2026-07-29) `src/components/PrimaryButton.tsx`
+  (named export; label/onPress/disabled; pressed-opacity feedback; a11y role +
+  label) adopted at all four sites. SyncBar's button unified to the shared
+  style — deliberate deltas: paddingVertical 12→16, weight 700→600, disabled
+  fill #999→#ccc, a11y label now tracks "Syncing…". Dev Reset button stays
+  its dev-red outline self.
+- [x] **P4 — Semantic results.** (2026-07-29) Item screen selected segment
+  fills pass→green / fail→red / na→neutral-gray with white text (was: black
+  for pass AND na). Checklist + history-detail result columns color
+  PASS/FAIL/NA semantically; unanswered "—" stays muted. (History detail was
+  a build-time scope add — same bug, same rendering; THEME_POLISH §8.)
+  AC pending: owner diff review, device visual pass, Windows eslint sweep.
+  tsc clean ✓ (no jest changes — no tests touched).
+- [x] **P5 — StatTile.** (2026-07-29, after owner approved P1–P4.) The three
+  Count copies (review, history detail, AuditCard) → `src/components/
+  StatTile.tsx`. Unified on the bordered white tile with NO size variant —
+  AuditCard's hand-rolled compact version (subtle fill, 18/11) adopts the
+  standard look (visible: History cards ~14pt taller, tiles bordered,
+  22/12 text). `color.subtle` + `radius.tile` died with it and were removed
+  from theme.ts (dead tokens are drift bait). Resolves the extraction
+  DECISIONS 2026-07-17 deferred. Details in THEME_POLISH §8. AC pending:
+  owner diff review + device look at the History list. tsc clean ✓.
 
 ### Signature: implement or remove (raised 2026-07-29, undecided)
 - [ ] The review screen's Signature section is a dashed "coming soon" placeholder

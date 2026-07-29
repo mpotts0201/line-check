@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { type AuditSummary } from "../../db/audits";
 import { type AuditSyncStateRow } from "../../db/syncQueue";
+import { color, font, radius } from "../../theme";
+import { StatTile } from "../StatTile";
 
 // completedAt is an ISO string; show its date portion. Kept manual (no date lib, no
 // reliance on Hermes Intl) so it renders identically on every device.
@@ -8,12 +10,11 @@ function formatDate(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "—";
 }
 
-// Named here rather than inline so the two states can't drift apart; a shared theme
-// constants file is still parked. Not-synced stays gray, not red — it isn't a dead
-// state, it self-heals on the next poke.
+// Named here rather than inline so the two states can't drift apart. Not-synced
+// stays gray, not red — it isn't a dead state, it self-heals on the next poke.
 const BADGE_COLOR = {
-  synced: "#2e7d32",
-  pending: "#999",
+  synced: color.success,
+  pending: color.muted,
 } as const;
 
 // Badge text + tint for one audit's card. The lookup can miss only if an audit completed
@@ -51,40 +52,22 @@ export function AuditCard({ audit, syncState, onPress }: AuditCardProps) {
         <Text style={styles.date}>{formatDate(audit.completedAt)}</Text>
       </View>
       <View style={styles.countsRow}>
-        <Count label="Pass" value={audit.passCount} />
-        <Count label="Fail" value={audit.failCount} tint="#c0392b" />
-        <Count label="N/A" value={audit.naCount} />
+        <StatTile label="Pass" value={audit.passCount} />
+        <StatTile label="Fail" value={audit.failCount} tint={color.danger} />
+        <StatTile label="N/A" value={audit.naCount} />
       </View>
       <Text style={[styles.sync, { color: badge.color }]}>{badge.label}</Text>
     </Pressable>
   );
 }
 
-// Private: exactly one consumer (the counts row above).
-function Count({
-  label,
-  value,
-  tint,
-}: {
-  label: string;
-  value: number;
-  tint?: string;
-}) {
-  return (
-    <View style={styles.count}>
-      <Text style={[styles.countValue, tint ? { color: tint } : null]}>{value}</Text>
-      <Text style={styles.countLabel}>{label}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
+    backgroundColor: color.card,
+    borderRadius: radius.card,
     padding: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ddd",
+    borderColor: color.border,
   },
   pressed: { opacity: 0.6 },
   headerRow: {
@@ -92,23 +75,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "baseline",
   },
-  name: { fontSize: 16, fontWeight: "600" },
-  date: { fontSize: 13, color: "#666" },
+  name: { fontSize: font.emphasis, fontWeight: "600" },
+  date: { fontSize: font.secondary, color: color.text },
   countsRow: { flexDirection: "row", gap: 8, marginTop: 12 },
-  count: {
-    flex: 1,
-    backgroundColor: "#fafafa",
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  countValue: { fontSize: 18, fontWeight: "700", color: "#1a1a1a" },
-  countLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#888",
-    textTransform: "uppercase",
-    marginTop: 2,
-  },
-  sync: { fontSize: 12, color: "#999", marginTop: 12, fontWeight: "600" },
+  sync: { fontSize: font.caption, color: color.muted, marginTop: 12, fontWeight: "600" },
 });

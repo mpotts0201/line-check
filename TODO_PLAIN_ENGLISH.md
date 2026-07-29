@@ -69,14 +69,20 @@ ring, never the data. (Plan and reasoning: SYNC_STATUS_FIX.md.)
 
 ## New on July 29 — making it look good
 
-- **The polish plan is written, waiting on your review.** THEME_POLISH.md is
-  the proposal: one shared file of named colors and sizes, blue as the app's
-  accent color (not green — green already means "passed" and "synced," and a
-  green button would look like a success message), and a handful of small
-  fix-it tickets. Two are honest bug fixes: a selected "Pass" currently fills
-  black, identical to a selected "N/A," and on the checklist a PASS reads in
-  the same gray as an unanswered item. Nothing gets built until you've read
-  the doc and answered its open questions — same drill as the sync rewrite.
+- **The polish plan was reviewed and built (July 29).** You approved the blue,
+  kept both grays, and took the gray screen background. What changed on
+  device: every color and text size now comes from one shared theme file;
+  screens have a soft gray background so the white cards stand out; all the
+  main buttons (Save, Review & Complete, Complete Audit, Sync now) are one
+  shared blue button component; and the two color bugs are fixed — a selected
+  "Pass" now fills green instead of the same black as "N/A," and PASS/FAIL/NA
+  on the checklist and past-audit screens read in green/red/gray instead of
+  one flat gray. After you approved that on the phone, the stat-tile cleanup
+  (P5) landed too: the little Pass/Fail/N/A count boxes that three screens
+  each hand-rolled are now one shared component with one look — the History
+  cards' counts got slightly bigger and match the other screens now. Still
+  parked from this plan: the two animations (after the 31st). Waiting on:
+  a diff review of the stat-tile change, then commit.
 - **We decided the "cumbersome" item flow stays — on purpose.** Tapping into
   each item and pressing Save is three steps, and we're keeping all three: a
   manager walking a line with wet or gloved hands shouldn't be able to record
