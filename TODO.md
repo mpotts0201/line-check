@@ -102,12 +102,29 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
 - Decision (2026-07-28, owner): the `attempts` column stays in the schema, dead —
   zero-risk for the deadline window. Dropping it is parked below.
 
+### S1 — Live badge signal (governing doc: SYNC_STATUS_FIX.md; un-parked 2026-07-29)
+- [x] (2026-07-29) The engine gets a `sync_finished` signal: new `src/sync/syncStore.ts`
+  (Zustand — first use in the repo; owner installed it this session), the engine's
+  `status` module var MOVES into the store (one copy in the app; the single-flight
+  guard reads it there), and `flushCount` bumps in `syncNow`'s `finally` — on failure
+  too, the signal means "ended," not "succeeded." `app/history/index.tsx` subscribes
+  to `flushCount` and re-runs its existing `refresh()` on each bump, so a background
+  flush flips the badge with no refocus. Store carries the signal, never query
+  results — SQLite stays the only read path. Four new engine test cases: bump on
+  success, bump on failure, no bump on a guarded no-op poke, status observable
+  mid-flight. AC: tsc clean; engine suite green (human runs jest on Windows);
+  device pass per SYNC_STATUS_FIX §8 (airplane-mode complete → sit on History →
+  reconnect → badge flips with no tap).
+
 ### 8b-iv — History cleanup (after R4; shrunken)
 - [ ] Extract `formatSyncError` + the (post-R4, much smaller) sync header into a
   co-located `app/history/SyncBar.tsx` — the screen passed the ~200-line guideline
   on 2026-07-21. DECISIONS entry: sync state is a separate query, not a join
   (GROUP BY fanout). The old entry's other half (per-audit vs global retry)
-  dissolved with 8b-iii.
+  dissolved with 8b-iii. Parked here from SYNC_STATUS_FIX §9 (owner decides at
+  ticket time): the button's `syncing` state could read the store's `status`
+  so background flushes show "Syncing…" too, and `runSync()`'s now-redundant
+  `refresh()` can go.
 
 ### Send-out essentials (was T9 — deadline scope)
 - [ ] README: demo GIF, architecture diagram, link DECISIONS.md, note the test
@@ -131,9 +148,6 @@ app demo-able for exactly this reason.**
   comment and the `SyncQueueRow` comment (`src/db/syncQueue.ts`), the two test
   helpers that still INSERT the column, and `getPendingSyncQueue`'s `SELECT *`
   (list columns explicitly while there).
-- [ ] History badge updates in real time instead of on focus — needs a data→UI
-  notification (small Zustand store or refetch-on-sync-complete signal).
-  Explicitly NOT part of the refactor (owner request 2026-07-27).
 - [ ] CI: GitHub Actions running `tsc --noEmit` + `jest` on push/PR (GitHub's
   Linux runners sidestep the Windows/WSL local-command constraint).
 - [ ] Reanimated polish (status button press, list transitions — small).

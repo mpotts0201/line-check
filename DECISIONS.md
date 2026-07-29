@@ -439,3 +439,46 @@ avoid a migration (drop parked post-7/31).
 - **Keeping attempts as quarantine only** (no backoff, skip rows after N failures) —
   rejected: keeps the counter, the threshold, the reset UX, and the stuck state for a
   poison scenario that is rare here and better handled by the documented production remedy.
+
+---
+
+## 2026-07-29 — Sync store carries the signal, not the data
+
+**Working document:** `SYNC_STATUS_FIX.md` (proposal approved 2026-07-29, built same day).
+
+**Decision:** The engine's `idle | syncing` status moves out of `syncEngine.ts`'s module
+variable into a ~12-line Zustand store (`src/sync/syncStore.ts` — first Zustand use in the
+repo), alongside a `flushCount` counter that `syncNow()` bumps in its `finally`. The bump is
+the `sync_finished` signal: History subscribes to `flushCount` and re-runs its existing
+`refresh()` (an SQLite re-query) whenever it changes, so a background flush — reconnect edge
+while the user is sitting on History — flips the badge live instead of on the next focus.
+The signal fires on failure too (`finally`, deliberately): it means "a flush attempt ended,
+re-read the world," not "success," matching the engine's existing ignore-the-result contract.
+The store never holds query results — SQLite remains the only read path; the store is a
+doorbell, not a filing cabinet.
+
+**Why:**
+- **The badge data had no push path.** `syncStates` is component state filled by a query;
+  focus, the manual button, and dev reset were the only writers. Background syncs updated
+  SQLite and told no one.
+- **One `status`, one home.** Mirroring engine status into a store while keeping the module
+  var would be two copies that can drift; moving it keeps the single-flight guard reading
+  the same value the UI watches.
+- **A counter, not a boolean or timestamp.** Every emission is a change (5→6→7), so effect
+  dependencies see back-to-back flushes; a boolean can repeat and be missed, a timestamp
+  drags in clock reads.
+
+**Alternatives considered:**
+- **expo-sqlite `addDatabaseChangeListener`** — a real push mechanism, wrong event shape:
+  fires per row (a 12-row drain = 12+ callbacks → needs a debounce), fires for unrelated
+  `sync_queue` writes (enqueue), only sees its own connection, and needs a global
+  `enableChangeListener` flip for one screen. The event we care about — "a flush ended" —
+  already exists at exactly one line in the engine.
+- **Hand-rolled listener set on the engine** (`onSyncFinished(cb)`) — bespoke pub/sub is the
+  hand-rolled plumbing the comprehension rule exists to avoid; Zustand is the stack's blessed
+  version of the same thing.
+- **Polling** — the battery-burning timer loop the 2026-07-28 rewrite just deleted.
+
+**Parked with 8b-iv (not forgotten):** the Sync now button reading `status` from the store
+(background flushes would show "Syncing…" and disable the buttons — a semantics change that
+belongs with the SyncBar extraction), and `isOnline` in the store for an offline indicator.

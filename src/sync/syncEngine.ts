@@ -7,13 +7,14 @@ import NetInfo from "@react-native-community/netinfo";
 import { type SqlDb } from "../db/types";
 import { supabase } from "../supabase";
 import { flushSyncQueue } from "./flush";
+import { useSyncStore } from "./syncStore";
 
-// The engine is always in exactly ONE of these modes.
-type EngineStatus = "idle" | "syncing";
+// The engine is always in exactly ONE of two modes (idle | syncing). That
+// status lives in syncStore — the UI watches it there — not in a module var,
+// so there is exactly one copy in the app.
 
 let db: SqlDb | null = null;   // written once at startup; why screens can call syncNow() bare
 let isOnline = false;          // input from the phone — a fact, not a mode
-let status: EngineStatus = "idle";
 
 // Called once from the root layout. Watches connectivity; when the phone goes
 // from offline to online, syncs. Returns a stop function for unmount.
@@ -36,7 +37,7 @@ export function startSyncEngine(database: SqlDb): () => void {
   // at teardown.
   return () => {
     unsubscribe();
-    status = "idle";
+    useSyncStore.setState({ status: "idle", flushCount: 0 });
     isOnline = false;
     db = null;
   };
@@ -46,9 +47,9 @@ export function startSyncEngine(database: SqlDb): () => void {
 // audit is already durable in SQLite; the reconnect trigger covers it later),
 // when the engine isn't started, or when a push is already in flight.
 export async function syncNow(): Promise<void> {
-  if (!db || !isOnline || status === "syncing") return;
+  if (!db || !isOnline || useSyncStore.getState().status === "syncing") return;
 
-  status = "syncing";
+  useSyncStore.setState({ status: "syncing" });
   try {
     // On failure, flush.ts leaves the queue fully intact and surfaces the error;
     // the next poke (signal edge, Submit, manual button) simply tries again.
@@ -61,6 +62,10 @@ export async function syncNow(): Promise<void> {
     // untouched either way; the next poke tries again.
     console.warn("[sync] unexpected failure", error);
   } finally {
-    status = "idle"; // ALWAYS comes back down, even if the push throws
+    // One atomic write: the busy flag ALWAYS comes back down (even if the push
+    // throws) AND sync_finished fires. Emitting in finally is deliberate —
+    // subscribers re-read SQLite either way, and on failure the re-read simply
+    // shows the queue still intact.
+    useSyncStore.setState((s) => ({ status: "idle", flushCount: s.flushCount + 1 }));
   }
 }

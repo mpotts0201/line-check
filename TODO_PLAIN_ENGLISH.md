@@ -52,6 +52,16 @@ session.
 Each step leaves the app working and demo-able, so if the 31st lands mid-rewrite,
 we ship anyway.
 
+## Live badges (done July 29)
+
+The History screen used to learn about background syncs only when you left and
+came back. Now the sync engine rings a doorbell every time a sync attempt
+finishes, and the screen re-reads its badges from the local database when it
+hears the ring. Watch History with airplane mode on, turn it off, and "Not
+synced" flips to "Synced ✓" by itself — no tap, no navigating away. First real
+use of Zustand: the doorbell is a tiny shared store, and it carries only the
+ring, never the data. (Plan and reasoning: SYNC_STATUS_FIX.md.)
+
 ## After that, before the 31st
 - **Tidy up.** Split the too-long History screen file.
 - **README + demo video.** The write-up and a screen recording of the
@@ -62,6 +72,5 @@ we ship anyway.
 
 ## After the 31st (parked)
 - Delete the now-unused failure-counter column from the database.
-- Badges updating live instead of when you revisit the screen.
 - Automatic test runs on GitHub, animations, a proper dev build.
 - Photo capture and upload (cut for the window).

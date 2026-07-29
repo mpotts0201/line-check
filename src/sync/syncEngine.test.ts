@@ -10,6 +10,7 @@ import NetInfo, { type NetInfoState } from "@react-native-community/netinfo";
 import { type SqlDb } from "../db/types";
 import { flushSyncQueue } from "./flush";
 import { startSyncEngine, syncNow } from "./syncEngine";
+import { useSyncStore } from "./syncStore";
 
 jest.mock("./flush");
 jest.mock("../supabase", () => ({ supabase: {} }));
@@ -45,8 +46,9 @@ describe("syncEngine", () => {
   let listener: (state: NetInfoState) => void;
 
   beforeEach(() => {
-    // Fresh engine per test — its state lives in module vars (db/isOnline/
-    // status) that would otherwise leak between tests. The engine never touches
+    // Fresh engine per test — its state lives in module vars (db/isOnline —
+    // status now lives in syncStore, reset by stop()) that would otherwise
+    // leak between tests. The engine never touches
     // the db handle itself (it only passes it to the mocked flush), so an empty
     // object suffices.
     stop = startSyncEngine({} as SqlDb);
@@ -133,6 +135,59 @@ describe("syncEngine", () => {
     // The finally brought the busy flag down: the next poke pushes again.
     await syncNow();
     expect(mockFlush).toHaveBeenCalledTimes(2);
+  });
+
+  // The store cases below read engine state where the UI reads it —
+  // useSyncStore.getState(), no React involved. The store needs no mocking
+  // (plain JS) and no per-test reset: afterEach's stop() zeroes it
+  // (SYNC_STATUS_FIX §4(c)).
+
+  it("a completed flush bumps flushCount and returns status to idle", async () => {
+    listener(report(true, true)); // the edge poke IS the flush under test
+    await settle();
+
+    expect(useSyncStore.getState().flushCount).toBe(1);
+    expect(useSyncStore.getState().status).toBe("idle");
+  });
+
+  it("a failed flush still bumps flushCount — the signal means 'ended', not 'succeeded'", async () => {
+    listener(report(true, true)); // get online; setup sync uses the automock
+    await settle();
+    expect(useSyncStore.getState().flushCount).toBe(1);
+
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    mockFlush.mockRejectedValueOnce(new Error("db exploded"));
+    await syncNow();
+    warn.mockRestore();
+
+    expect(useSyncStore.getState().flushCount).toBe(2); // finally fired the signal anyway
+  });
+
+  it("a guarded no-op poke emits nothing", async () => {
+    await syncNow(); // isOnline is false from cold start → early return
+
+    expect(useSyncStore.getState().flushCount).toBe(0);
+  });
+
+  it("status is observable mid-flight", async () => {
+    listener(report(true, true)); // get online; this edge sync is setup noise
+    await settle();
+
+    // Hold the push open (same gate pattern as the single-flight test) so the
+    // in-between state can be read directly instead of inferred.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    mockFlush.mockImplementationOnce(async () => {
+      await gate;
+      return { status: "empty" };
+    });
+
+    const inFlight = syncNow();
+    expect(useSyncStore.getState().status).toBe("syncing");
+
+    release();
+    await inFlight;
+    expect(useSyncStore.getState().status).toBe("idle");
   });
 
   it("after cleanup, pokes do nothing", async () => {

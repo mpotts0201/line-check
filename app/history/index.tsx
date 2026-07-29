@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { getCompletedAudits, type AuditSummary } from "../../src/db/audits";
 import { resetAuditData } from "../../src/db/dev";
@@ -10,6 +10,7 @@ import {
   type AuditSyncStateRow,
 } from "../../src/db/syncQueue";
 import { syncNow } from "../../src/sync/syncEngine";
+import { useSyncStore } from "../../src/sync/syncStore";
 
 // completedAt is an ISO string; show its date portion. Kept manual (no date lib, no
 // reliance on Hermes Intl) so it renders identically on every device.
@@ -72,6 +73,10 @@ export default function History() {
   const [syncStates, setSyncStates] = useState<Record<string, AuditSyncStateRow>>({});
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  // Selector = re-render only when the counter moves, not on status flips
+  // (this screen doesn't read status; the button's spinner is still local —
+  // wiring it to the store is parked with 8b-iv, see SYNC_STATUS_FIX §9).
+  const flushCount = useSyncStore((s) => s.flushCount);
 
   // Summaries and sync states are two queries merged here by audit id — joining sync_queue
   // into the summaries query would fan out the GROUP BY that builds the pass/fail/na counts
@@ -99,6 +104,14 @@ export default function History() {
       refresh();
     }, [refresh])
   );
+
+  // The engine's sync_finished signal: a background flush ended (reconnect edge,
+  // or a completion poke from another screen) — re-read badges from SQLite. Fires
+  // once on mount too, doubling the focus effect's read; both are cheap SELECTs of
+  // the same truth, so a first-run latch isn't worth its lifecycle footnote.
+  useEffect(() => {
+    refresh();
+  }, [flushCount, refresh]);
 
   // Manual sync — the third poke (the others: the reconnect edge and Submit). Goes through
   // syncNow() so all three share the engine's single-flight guard; before this, the button
