@@ -539,3 +539,42 @@ with the retry removal.)
 
 **Still parked:** `isOnline` in the store for an offline indicator (new surface, not
 cleanup); the shared theme/constants file (`BADGE_COLOR` stays in AuditCard).
+
+---
+
+## 2026-07-29 — Item entry keeps its dedicated screen and explicit Save; one-tap fast path rejected
+
+**Context:** While planning the theme/polish pass (THEME_POLISH.md), a "Tier 2"
+interaction redesign was on the table: for items that don't require a temperature,
+tapping Pass could save immediately and pop back to the checklist — collapsing
+tap item → tap Pass → tap Save into two taps, across ~20 items per line check.
+
+**Decision:** Rejected. Recording a result stays a three-step, deliberately
+"cumbersome" flow: navigate into the item screen, pick a result, explicitly Save.
+The polish pass is cosmetics only; no interaction changes.
+
+**Why:**
+- **The friction is a failsafe, not a defect.** The user is walking a line with the
+  phone in one hand — wet hands, gloves, bumps. A dedicated screen plus an explicit
+  Save means a stray touch can't silently record a result on a food-safety record.
+  Fat-fingering an option while moving is the likely error mode; the extra step is
+  what absorbs it.
+- **Intention fits the domain.** An audit is an attestation, item by item. A flow
+  that makes each entry a deliberate act matches what the record claims to be —
+  speed-running pass marks is exactly what a paper-whipped line check looks like.
+- **The fast path forks the flow.** Notes and temps still need the full screen, so
+  one-tap creates two entry modes keyed on item type — the same multi-mode shape
+  this log already rejected for the review screen (2026-07-17). And putting three
+  pressables on every checklist row alongside row-tap navigation crowds the row
+  into competing targets.
+- **POC honesty:** yes, this is a portfolio piece and nobody audits with it. But
+  "what would I build if it were real" is the stated design priority, so it's
+  designed as if real — and the rejection itself is the demo-able judgment.
+
+**Alternatives considered:**
+- **One-tap save-and-pop for non-temp items** — rejected: forked flow, fat-finger
+  exposure, weaker record semantics (above).
+- **Inline pass/fail/na buttons on checklist rows** — rejected: crowded rows,
+  three small targets next to a navigation target, worst-case for gloved use.
+- **Confirm-on-exit instead of a Save button** (auto-save drafts on back) —
+  rejected: blurs "recorded" vs "abandoned" for no tap savings.

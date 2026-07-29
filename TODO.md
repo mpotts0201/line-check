@@ -135,6 +135,28 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
     written. AC pending: jest on Windows, §3 device pass (manual sync, reset,
     airplane-mode reconnect badge flip).
 
+### P — Theme polish (proposal 2026-07-29 — governing doc: THEME_POLISH.md, GATED)
+- [ ] Owner reads THEME_POLISH.md and answers its §7 open questions (brand blue
+  value, gray merge, screen background, StatTile worth-it). Same process as
+  REFACTOR_PROPOSAL/SYNC_STATUS_FIX: **no styling code before the gate passes.**
+  After the gate, copy its P1–P5 tickets here as bullets (P6 motion is already
+  parked below under Reanimated). Tier 2 (one-tap fast path) was REJECTED —
+  DECISIONS 2026-07-29 — and does not become a ticket.
+
+### Signature: implement or remove (raised 2026-07-29, undecided)
+- [ ] The review screen's Signature section is a dashed "coming soon" placeholder
+  (`app/audit/review/[auditId].tsx`). Decide: **implement** real capture or
+  **remove** the section so the demo shows no stubs. Owner leans IMPLEMENT — the
+  signature is the credibility beat of the whole "signed food-safety record"
+  concept. If implementing: `react-native-signature-canvas` is NOT installed
+  (the CLAUDE.md stack line is aspirational, like Zustand was pre-S1); human
+  runs `npm install react-native-signature-canvas` + `npx expo install
+  react-native-webview` (its peer dep; webview is Expo Go-compatible) on
+  Windows. Scope sketch: capture → local URI into `audits.signatureUri` at
+  completion; remote upload stays deferred exactly like photos (schema.sql's
+  `signature_path` mapping is 8a-class work). Not scheduled — Send-out
+  essentials come first.
+
 ### Send-out essentials (was T9 — deadline scope)
 - [ ] README: demo GIF, architecture diagram, link DECISIONS.md, note the test
   suite. (The known-limitations story lands in R5.)

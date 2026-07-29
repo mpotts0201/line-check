@@ -63,9 +63,30 @@ use of Zustand: the doorbell is a tiny shared store, and it carries only the
 ring, never the data. (Plan and reasoning: SYNC_STATUS_FIX.md.)
 
 ## After that, before the 31st
-- **Tidy up.** Split the too-long History screen file.
+- **Tidy up (done July 29).** Split the too-long History screen file.
 - **README + demo video.** The write-up and a screen recording of the
   airplane-mode demo.
+
+## New on July 29 — making it look good
+
+- **The polish plan is written, waiting on your review.** THEME_POLISH.md is
+  the proposal: one shared file of named colors and sizes, blue as the app's
+  accent color (not green — green already means "passed" and "synced," and a
+  green button would look like a success message), and a handful of small
+  fix-it tickets. Two are honest bug fixes: a selected "Pass" currently fills
+  black, identical to a selected "N/A," and on the checklist a PASS reads in
+  the same gray as an unanswered item. Nothing gets built until you've read
+  the doc and answered its open questions — same drill as the sync rewrite.
+- **We decided the "cumbersome" item flow stays — on purpose.** Tapping into
+  each item and pressing Save is three steps, and we're keeping all three: a
+  manager walking a line with wet or gloved hands shouldn't be able to record
+  a food-safety result with one stray touch. The friction is the safety.
+  Written down in the decision log.
+- **The signature box needs a call: build it or delete it.** Right now it says
+  "coming soon," which is the one visible stub in the app. Leaning toward
+  building it — a real signature is what makes the whole "signed record" idea
+  land. Needs two packages installed first (noted in TODO.md). Decision only;
+  it's not scheduled ahead of the README and demo video.
 
 ## Chores (not blocking)
 - Run eslint on Windows over the recent commits (it can't run on the Linux side).
