@@ -153,29 +153,32 @@ questions ("did the read work" vs "did the push land").
   (parked in DECISIONS with 8b-iv — proposing it stays parked; it's new
   surface, not cleanup, and the 7/31 clock is real).
 
-## 5. Open questions — owner decides before step 3
+## 5. Owner decisions — RESOLVED 2026-07-29
 
-These two were explicitly parked "owner decides at ticket time"
-(TODO.md:124–127, DECISIONS.md:482–484):
+These two were parked "owner decides at ticket time" (TODO.md:124–127,
+DECISIONS.md:482–484). Both were reviewed and decided; both land in step 3's
+diff.
 
-**Q1 — Should the button's `syncing` read the store's `status` instead of
-local state?** Effect: a *background* flush (reconnect edge, completion poke)
-would also show "Syncing…" and disable both buttons; today only a manual press
-does. Honest UI, but it means Reset flickers disabled when wifi comes back.
-My lean: **yes, take it** — it deletes the local `syncing` state entirely
-(`const isSyncing = useSyncStore((s) => s.status === "syncing")`), one state
-copy instead of two, and the disable-Reset-mid-flush comment already says the
-disable is about flush safety, not about who started the flush.
+**Q1 — DECIDED: the button reads the store's `status`.** Local `syncing`
+state is deleted; `const isSyncing = useSyncStore((s) => s.status ===
+"syncing")`. Background flushes (reconnect edge, completion poke) now show
+"Syncing…" and disable both buttons. Deciding factor: the Reset button's
+mid-flush disable currently only covers manual flushes — a background flush
+on reconnect can be mid-upsert while Reset is still tappable, which is
+exactly the sync_queue-wipe hazard the disable comment warns about. Reading
+the store closes that gap and removes the `finally { setSyncing(false) }`
+cleanup obligation (the engine owns resetting its status). Accepted
+tradeoff: a brief unprompted "Syncing…" flicker on reconnect.
 
-**Q2 — Drop `runSync()`'s trailing `refresh()`?** The flushCount bump in the
-engine's `finally` already triggers the parent's effect, so the explicit call
-is a second read of the same truth. My lean: **yes, drop it** — with it gone,
-`onDataChanged` is only called after reset, and the data flow has exactly one
-badge-refresh channel (the signal). If dropped, SyncBar's own
-`getSyncQueueStats` status read stays (that's the status *message*, not the
-badge data).
-
-Answer these two in review; both land inside step 3's diff either way.
+**Q2 — DECIDED: drop `runSync()`'s trailing `refresh()`.** Since S1, the
+engine's `finally` bumps `flushCount` and the screen's effect already
+refreshes on every bump, so the explicit call was a second delivery of the
+same message. The no-op-poke path was checked: a guarded early return
+(offline/busy) doesn't bump the counter, but it also changes nothing in
+SQLite, so there is nothing to re-read — and the status message still comes
+from `getSyncQueueStats`, which stays. Result: badges refresh through
+exactly one channel (the signal), and SyncBar's `onDataChanged` fires only
+after dev reset.
 
 ## 6. Execution steps — one per session, per working agreement
 
