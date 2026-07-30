@@ -15,8 +15,9 @@ import * as FileSystem from "expo-file-system/legacy";
 // audit completes at most once, so there is no collision case; a failed-completion
 // retry simply overwrites the same file.
 //
-// Upload to the Supabase storage bucket is NOT this function's job — that stays
-// deferred alongside photo upload (see SIGNATURE_CAPTURE_PROPOSAL.md).
+// Upload to the Supabase storage bucket is NOT this function's job — the flush
+// does that via readSignatureBase64 below (STORAGE_WIREIN_PROPOSAL.md); photos
+// remain the deferred half of the pattern.
 export async function saveSignaturePng(
   auditId: string,
   signatureDataUrl: string
@@ -27,4 +28,13 @@ export async function saveSignaturePng(
     encoding: FileSystem.EncodingType.Base64,
   });
   return fileUri;
+}
+
+// The flush's read half: PNG on disk → base64 for the Storage upload. Lives here
+// (not in flush.ts) so flush keeps zero native imports — its tests mock THIS
+// module (the syncEngine.test precedent) and stay native-free.
+export async function readSignatureBase64(fileUri: string): Promise<string> {
+  return FileSystem.readAsStringAsync(fileUri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
 }

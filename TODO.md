@@ -178,10 +178,18 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
   (owner's call — practical package over hand-rolled). Design doc
   `SIGNATURE_CAPTURE_PROPOSAL.md`; rationale + the legacy-file-API Expo Go
   quirk in DECISIONS 2026-07-30. Full-screen modal capture, PNG at completion,
-  URI rides completeAudit's txn; schema gate requires signature. Remote upload
-  still deferred with photos (owner has an unwired Supabase bucket — NEXT).
-  AC pending at commit time: completion-path retest on device (first attempt
-  threw via the SDK 54 File API; swapped to legacy writeAsStringAsync).
+  URI rides completeAudit's txn; schema gate requires signature. Retest PASSED
+  on device 2026-07-30 (the legacy writeAsStringAsync swap was the fix — the
+  SDK 54 File API was the Expo Go thrower).
+- [x] STORAGE WIRE-IN (same day, follow-on): signature PNG uploads to the
+  public `signatures` bucket inline in the flush, before row upserts;
+  `signature_path` gets `<auditId>.png` (null for pre-feature audits). Doc =
+  `STORAGE_WIREIN_PROPOSAL.md` (gate passed, owner took all three recs);
+  DECISIONS 2026-07-30 has the four calls (inline-in-flush, object path,
+  public-bucket posture, seam growth). Owner-side dashboard work DONE: bucket
+  (1MB, image/png), both anon policies. AC pending: device pass — airplane
+  complete → reconnect → PNG visible in bucket browser; jest + eslint on
+  Windows.
   Original ticket text follows for posterity:
 - The review screen's Signature section WAS a dashed "coming soon" placeholder
   (`app/audit/review/[auditId].tsx`). Decide: **implement** real capture or

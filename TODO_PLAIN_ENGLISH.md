@@ -91,10 +91,14 @@ ring, never the data. (Plan and reasoning: SYNC_STATUS_FIX.md.)
   July 30. Tap the box on the review screen, a full-screen pad opens, sign with
   a finger, Clear to retry, Done to capture. Completing the audit now requires
   a signature and saves it as a PNG on the phone; it rides the same sync path
-  as everything else. Uploading the image itself to the cloud bucket is still
-  future work (same boat as photos). One loose end at commit time: the very
-  last step (tapping Complete) threw an error on device once — the file-writing
-  code was swapped to the older, battle-tested API and needs one retest.
+  as everything else. The retest passed — the error was a quirk in the newer
+  file-writing API under Expo Go; the older API fixed it. AND the cloud upload
+  is now wired too: when the app syncs, the signature image goes up to a
+  Supabase storage bucket first, then the audit rows point at it. The bucket is
+  public-read on purpose for the demo (documented, with the guardrails: capped
+  file size, PNG-only, unguessable names). Photos remain the future half of
+  this pattern. Needs one device test: complete an audit in airplane mode,
+  reconnect, then see the image appear in the Supabase dashboard.
 
 ## New on July 30 — the two animations (pulled forward)
 

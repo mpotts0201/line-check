@@ -691,3 +691,50 @@ capsule — `src/files/signature.ts` uses `expo-file-system/legacy`'s
 exactly this base64→PNG case. Alternatives: debugging the class API on device
 (deferred — revisit on a dev build), or storing base64 in SQLite (bloats rows
 ~20–100KB and diverges from the photoUri file pattern).
+
+## 2026-07-30 — Storage wire-in: signature upload inline in the flush; public bucket accepted for the POC
+
+**Decision 1 — upload inside `flushSyncQueue`, before the row upserts.** One
+sync ceremony: the existing no-retry model covers the upload for free (any
+failure → choke-point warn → queue intact → next poke retries everything), and
+uploading first means a synced row never references an object that doesn't
+exist. The deterministic path (`<auditId>.png`) plus `upsert: true` makes every
+retry an overwrite — the storage twin of the row upserts' merge-on-id.
+Alternatives rejected: a second upload phase after row sync (doubles the sync
+states for a ~20KB file; the refactor's whole point is one legible machine) and
+upload-at-completion (breaks offline-first). Accepted partial state: upload
+lands, row upsert fails, audit never re-syncs → one orphaned ~20KB object.
+Owner accepted at gate.
+
+**Decision 2 — remote stores the in-bucket object path, not a URL.**
+`signature_path` gets `<auditId>.png`; the bucket name is a code constant.
+URLs derive from paths at read time; paths can't be recovered from stale URLs.
+Audits predating the signature feature sync `signature_path: null`.
+
+**Decision 3 — public `signatures` bucket with anon write policies, accepted
+as the POC posture.** Public-read + THREE RLS policies on `storage.objects`
+(insert + update + select, `to anon`, all scoped `bucket_id = 'signatures'`) —
+the storage twin of RLS-off on the tables, documented in README
+known-limitations. The select policy was not optional: with only insert +
+update, plain inserts succeeded but any `x-upsert: true` upload failed with
+"new row violates row-level security policy" — the storage API's upsert path
+needs the object row to be *visible* (curl-isolated on device day; the
+proposal's gotcha section predicted exactly this). The select policy exposes
+object *metadata rows* to anon; image readability was already public via the
+bucket toggle. Risk
+reasoning: the public toggle affects reads only (no listing, no writes);
+object paths are client-generated UUIDs — capability URLs; the bucket caps
+files at 1MB and `image/png` only, bounding anon-key abuse; only demo data is
+signed. Production shape is named: private bucket, authenticated policies,
+signed URLs.
+
+**Decision 4 — the seams stayed, no new plumbing.** `SyncClient` grew a
+`storage.from().upload()` slice mirroring the real client structurally (the
+real client satisfies it unchanged; the test fake scripts a storage branch).
+The PNG read lives in `src/files/signature.ts` (`readSignatureBase64`) so
+flush.ts keeps zero native imports — flush tests `jest.mock` that module, the
+precedent syncEngine.test set. base64→ArrayBuffer via the `base64-arraybuffer`
+package (Supabase's documented RN pattern; owner's standing practical-over-
+hand-rolled call). Gotcha pinned in code: `contentType: "image/png"` is
+load-bearing — the bucket's MIME restriction rejects the inferred
+octet-stream without it.

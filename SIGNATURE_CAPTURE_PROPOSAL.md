@@ -6,8 +6,10 @@ fixed: try/catch + Alert around the completion write; 3 Nits fixed), dev harness
 deleted after the owner's device pass of the signing UI. File write switched to
 expo-file-system/legacy after the SDK 54 File API threw on device (DECISIONS
 2026-07-30). Open questions below were resolved as proposed: signature required,
-discard-on-leave, no signer field. OUTSTANDING: completion-path retest on device
-(the API swap is unverified), and the Storage upload wire-in (next ticket).**
+discard-on-leave, no signer field. Completion-path retest PASSED on device
+2026-07-30 (post-commit) — the legacy-API swap was the fix, confirming the SDK
+54 File class API as the Expo Go thrower. OUTSTANDING: the Storage upload
+wire-in (next ticket).**
 Resolves the TODO ticket "Signature: implement or remove (raised 2026-07-29)" as **IMPLEMENT**.
 
 ## What and why
