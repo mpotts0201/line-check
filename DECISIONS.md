@@ -625,3 +625,30 @@ and it keeps a tap on the already-selected segment silent for free.
   two strings, so an opacity dip would just flicker. Color-only; adding
   `"opacity"` later is a one-word change if the sweep reads too subtle on
   device.
+
+**Addendum (2026-07-30, same day):** on-device, both moments read as invisible —
+owner asked for a bump. Segment pop flipped from compress (0.95) to enlarge
+(1.12): a fingertip covers the button, so shrinking hides under it while growing
+escapes it. The badge gained a scale bump (grow 1.15 ~120ms, spring back) on the
+pending→synced flip. That one IS effect-driven — unlike the segment there is no
+gesture to hang the spring on, so a `wasSynced` ref guard supplies the
+changes-only semantics the CSS transition gets for free (mounts and FlatList
+recycles stay static). The bump rides on a wrapper `Animated.View` that hugs the
+word and scales from its left edge; CSS-transition props and `useAnimatedStyle`
+stay on separate components.
+
+**Second addendum (2026-07-30): `ReduceMotion.Never` on the spring/timing cues.**
+Even after the amplitude pass, nothing moved on device. Diagnosis (via a
+UI-thread log stream and a forced `ReduceMotion.Never` test spring): the
+animation runtime treats the system reduce-motion flag as ON even though the
+iOS global toggle is off — every default-mode `withSpring`/`withTiming` was
+snapping straight to its end value. Likely culprits: iOS 26 per-app
+accessibility settings for Expo Go, or an iOS 26/Expo Go detection quirk.
+Decision: the segment pop and badge bump pin `reduceMotion: ReduceMotion.Never`
+— they are brief (~150–300ms), small-amplitude, state-carrying cues, and the
+flag is demonstrably unreliable in this environment; a flag that misreports ON
+would otherwise kill the demo's centerpiece. The CSS color transition needs no
+override — reanimated's CSS module doesn't consult the flag at all (verified in
+the installed source). Revisit if the app ever ships to real users: honoring
+reduce motion for the scale cues (while keeping the color sweep) would be the
+accessible production behavior.

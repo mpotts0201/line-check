@@ -6,6 +6,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -13,9 +14,13 @@ import Animated, {
 import { color, font, radius } from "../theme";
 
 // Subtle tap pop: settles in ~150ms with a hair of overshoot.
+// ReduceMotion.Never is deliberate (DECISIONS 2026-07-30 addendum): this is a
+// brief, small state-change cue, and the runtime's reduce-motion flag proved
+// unreliable on device (reported on while the system toggle was off).
 const POP = {
   damping: 14, // how fast the bounce dies out
   stiffness: 300, // how fast it snaps back to rest
+  reduceMotion: ReduceMotion.Never,
 } as const;
 
 type SegmentButtonProps = {
@@ -37,8 +42,8 @@ export function SegmentButton({ label, selected, selectedStyle, onPress }: Segme
 
   function handlePress() {
     if (!selected) {
-      scale.value = 0.95; // snap compressed…
-      scale.value = withSpring(1, POP); // …spring back: feedback for the change
+      scale.value = 1.12; // snap enlarged — a bump that reads under a fingertip…
+      scale.value = withSpring(1, POP); // …then settle back to rest
     }
     onPress();
   }

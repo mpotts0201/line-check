@@ -1,5 +1,14 @@
+import { useEffect, useRef } from "react";
 import { Pressable, StyleSheet, Text, View, type TextStyle } from "react-native";
-import Animated, { type CSSStyle } from "react-native-reanimated";
+import Animated, {
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+  type CSSStyle,
+} from "react-native-reanimated";
 import { type AuditSummary } from "../../db/audits";
 import { type AuditSyncStateRow } from "../../db/syncQueue";
 import { color, font, radius } from "../../theme";
@@ -29,6 +38,19 @@ const syncColorTransition: CSSStyle<TextStyle> = {
   transitionDuration: "300ms",
 };
 
+// The bump that rides along with the color sweep: grow briefly, spring back.
+// ReduceMotion.Never on both legs is deliberate (DECISIONS 2026-07-30
+// addendum): a brief, small state-change cue, and the runtime's reduce-motion
+// flag proved unreliable on device. (The CSS color transition doesn't consult
+// the flag at all, so it needs no override.)
+const BUMP_SCALE = 1.15;
+const GROW = { duration: 120, reduceMotion: ReduceMotion.Never } as const;
+const SETTLE = {
+  damping: 12, // how fast the bounce dies out
+  stiffness: 220, // how fast it pulls back to rest
+  reduceMotion: ReduceMotion.Never,
+} as const;
+
 // Badge text + tint for one audit's card. The lookup can miss only if an audit completed
 // between the History screen's two queries; the fallback reads Not synced for the same
 // reason a drained-queue-but-unconfirmed audit does — never claim a confirmation we
@@ -52,6 +74,22 @@ type AuditCardProps = {
 // badge. Data in, one event out — no store or db access; the screen owns both queries.
 export function AuditCard({ audit, syncState, onPress }: AuditCardProps) {
   const badge = syncBadge(syncState);
+
+  // Scale bump on the live pending→synced flip. The CSS color transition above
+  // is changes-only by construction; this effect needs the ref guard to match —
+  // without it, a card that MOUNTS synced (first render, FlatList recycle)
+  // would bump too.
+  const isSynced = syncState?.state === "synced";
+  const wasSynced = useRef(isSynced);
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    if (isSynced && !wasSynced.current) {
+      scale.value = withSequence(withTiming(BUMP_SCALE, GROW), withSpring(1, SETTLE));
+    }
+    wasSynced.current = isSynced;
+  }, [isSynced, scale]);
+  const bump = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
@@ -68,9 +106,15 @@ export function AuditCard({ audit, syncState, onPress }: AuditCardProps) {
         <StatTile label="Fail" value={audit.failCount} tint={color.danger} />
         <StatTile label="N/A" value={audit.naCount} />
       </View>
-      <Animated.Text style={[styles.sync, syncColorTransition, { color: badge.color }]}>
-        {badge.label}
-      </Animated.Text>
+      {/* Bump on the wrapper, color transition on the text: CSS-transition props
+          and useAnimatedStyle stay on separate components. The wrapper hugs the
+          word (alignSelf) and scales from its left edge so the badge grows in
+          place instead of drifting. */}
+      <Animated.View style={[styles.syncWrap, bump]}>
+        <Animated.Text style={[styles.sync, syncColorTransition, { color: badge.color }]}>
+          {badge.label}
+        </Animated.Text>
+      </Animated.View>
     </Pressable>
   );
 }
@@ -92,5 +136,6 @@ const styles = StyleSheet.create({
   name: { fontSize: font.emphasis, fontWeight: "600" },
   date: { fontSize: font.secondary, color: color.text },
   countsRow: { flexDirection: "row", gap: 8, marginTop: 12 },
-  sync: { fontSize: font.caption, color: color.muted, marginTop: 12, fontWeight: "600" },
+  syncWrap: { alignSelf: "flex-start", marginTop: 12, transformOrigin: "left center" },
+  sync: { fontSize: font.caption, color: color.muted, fontWeight: "600" },
 });

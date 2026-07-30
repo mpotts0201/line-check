@@ -300,6 +300,16 @@ spring, `segmentPass/Fail/Na` + `SELECTED_STYLE` stay in the route. tsc
 clean; jest untouched (no test imports components). AC pending: owner diff
 review, Windows jest + eslint, and the §9 device pass.
 
+**Amplitude pass (2026-07-30, after the on-device look):** both moments read
+as invisible — §5's "subtle" was too subtle for the demo. Segment pop flipped
+from compress (0.95) to an enlarge bump (1.12) — a fingertip covers the
+button, so shrinking hides under it. The badge gained a scale bump
+(grow 1.15 over ~120ms, spring settle) alongside the color sweep on the
+pending→synced flip — effect-driven with a `wasSynced` ref guard, since a
+status change has no gesture to hang a spring on; the guard keeps mounts and
+recycles static, matching the transition's changes-only semantics. Details in
+the DECISIONS 2026-07-30 addendum.
+
 ## 9. P6 implementation plan (2026-07-30 — pulled forward from post-7/31)
 
 Owner call: the badge flip is the demo's money shot, and the demo recording is
