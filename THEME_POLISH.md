@@ -2,7 +2,8 @@
 
 Status: **GATE PASSED 2026-07-29** (owner answered §7 same day — answers and
 build log in §8). P1–P4 built 2026-07-29 in one owner-approved session; P5
-deferred to a reconvene; P6 stays parked with the Reanimated bullet.
+built later that day; P6 pulled forward and built 2026-07-30 (plan in §9,
+build log in §8).
 
 Scope guard: this is **cosmetics and consolidation only** — colors, spacing,
 shared style primitives. Zero behavior changes, zero navigation changes. The
@@ -181,7 +182,8 @@ deadline without hurting the demo.
   deferred "to a separate cleanup"; this is that cleanup) into
   `src/components/StatTile.tsx` (named export; `label`, `value`, `tint?`).
   AC: tsc clean; the three screens render identically to pre-extraction.
-- **P6 — Motion (PARKED post-7/31; spec only).** Two moments, both reanimated,
+- **P6 — Motion (was parked post-7/31; pulled forward and built 2026-07-30 —
+  owner call, plan in §9, build log in §8).** Two moments, both reanimated,
   both state-change feedback, nothing decorative: (1) the History sync badge
   animates its pending→synced flip (color/opacity transition on the
   `flushCount`-driven re-render) — this is the demo's money shot, the whole
@@ -273,3 +275,234 @@ census, none changes the design's intent):
   arrives.
 - StatTile is new code, so it uses `space` tokens (`space.lg` padding,
   `space.xs` label gap) — first adoption beyond PrimaryButton.
+
+**P6 build (2026-07-30, pulled forward — owner call, deadline-eve):**
+
+Built per the §9 plan; idiom tradeoff logged in DECISIONS 2026-07-30. Three
+deviations from §9's sketches, all found at build time:
+
+- **The transition constant is typed `CSSStyle<TextStyle>`, not
+  `CSSTransitionProperties`.** In a style-array position, reanimated's style
+  type wants "a TextStyle that may also carry the transition keys" — which is
+  exactly what `CSSStyle<TextStyle>` names. A bare `CSSTransitionProperties`
+  fails to type-check inside the array.
+- **`transitionDuration` is the string `"300ms"`, not the number `300`.**
+  RN's own style types (New Architecture) also declare the transition keys,
+  as strings; the intersection with reanimated's type makes the CSS string
+  form the one that satisfies both.
+- **SegmentButton gained `accessibilityRole`/`accessibilityLabel`/
+  `accessibilityState({ selected })`** — not in §9's sketch, but the
+  standards require them on touchables, and the extraction is the natural
+  moment to close the gap (the old inline Pressables never had them).
+
+Everything else landed as planned: color-only on the badge, press-driven
+spring, `segmentPass/Fail/Na` + `SELECTED_STYLE` stay in the route. tsc
+clean; jest untouched (no test imports components). AC pending: owner diff
+review, Windows jest + eslint, and the §9 device pass.
+
+## 9. P6 implementation plan (2026-07-30 — pulled forward from post-7/31)
+
+Owner call: the badge flip is the demo's money shot, and the demo recording is
+still owed — so the motion lands *before* the recording, not after the 31st.
+First Reanimated use in the app. `react-native-reanimated ~4.1.1` +
+`react-native-worklets 0.5.1` are already installed, and babel-preset-expo
+auto-injects the worklets plugin (see DECISIONS.md babel entry) — zero config
+work, zero new dependencies, no Metro restart needed. Expo Go SDK 54 runs the
+New Architecture, which Reanimated 4 requires.
+
+The trigger plumbing already exists: `flushCount` (Zustand) → `refresh()` in
+`app/history/index.tsx` → new `syncState` prop on the mounted, keyed card. The
+flip is a **prop change on a mounted component**, not a remount — exactly what
+a transition can animate.
+
+### The idiom decision — two idioms, on purpose
+
+Godot framing: a Tween for a property that changes, a physics impulse for an
+event that happens. Reanimated draws the same line, and each moment gets the
+tool on its side of it:
+
+- **Badge → Reanimated 4 CSS-transition API** (`transitionProperty: "color"`
+  on `Animated.Text`). The badge color is *derived state* — it arrives from
+  data, not a gesture. A transition declares "when this property changes,
+  tween it"; the component keeps rendering exactly what it renders today.
+  Decisive bonus: by web-CSS semantics a transition animates **changes only,
+  never the initial value** — so "no animation on first mount / FlatList
+  recycle" is solved by construction, with zero guard code. (Verified:
+  `CSSTransitionProperties` is a public type export of the installed 4.1.1.)
+- **Segment → `useSharedValue` + `useAnimatedStyle` + `withSpring`**. A spring
+  is physics responding to an impulse (the tap); CSS timing functions can't
+  express one. The classic idiom is the right tool here, and using both is
+  the framework's own declarative/imperative split, not inconsistency.
+
+Two more calls made at plan time:
+
+- **Color-only on the badge, no opacity dip.** The label text swaps instantly
+  ("Not synced — N waiting" → "Synced ✓"); an opacity dip can't crossfade two
+  different strings in one `Text`, it would just add a flicker. The gray→green
+  sweep *is* the moment. If it reads too subtle on device, adding `"opacity"`
+  to `transitionProperty` is a one-word change — decided then, not pre-built.
+- **Press-driven spring, not a `selected` effect.** The item screen seeds
+  `result` from SQLite on reopen; an effect watching `selected` would pop the
+  saved segment on screen open — a mount animation this spec's philosophy
+  forbids. Selection can *only* change via press, so `if (!selected)` in the
+  press handler is exactly "on becoming selected" — and it keeps a tap on the
+  already-selected segment silent (state-change feedback only).
+
+### File 1 — `src/components/history/AuditCard.tsx` (~6-line diff)
+
+```tsx
+import Animated, { type CSSTransitionProperties } from "react-native-reanimated";
+
+// Module scope: one stable object across every card render (list-item prop
+// rule). CSS-transition semantics animate CHANGES only — a card that mounts
+// already-synced renders green statically; only the live pending→synced flip
+// (flushCount → refresh → new color prop) tweens.
+const syncColorTransition: CSSTransitionProperties = {
+  transitionProperty: "color",
+  transitionDuration: 300,
+};
+```
+
+The badge line becomes:
+
+```tsx
+<Animated.Text style={[styles.sync, syncColorTransition, { color: badge.color }]}>
+  {badge.label}
+</Animated.Text>
+```
+
+Notes: the constant lives *outside* `StyleSheet.create` because RN's
+`TextStyle` doesn't know the CSS keys — `CSSTransitionProperties` is the
+reanimated-blessed way to keep it type-checked. The keys are silently dead on
+a plain `Text`; `Animated.Text` is what makes them live. `syncBadge`,
+`BADGE_COLOR`, and every style stay untouched.
+
+### File 2 — `src/components/SegmentButton.tsx` (NEW, ~55 lines)
+
+Flat in `src/components/` beside `PrimaryButton`/`StatTile` (named export).
+The extraction is forced, not stylistic: each segment needs its own
+`useSharedValue`, and hooks can't be called inside `RESULTS.map` in the route
+body.
+
+```tsx
+import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import { color, font, radius } from "../theme";
+
+// Subtle tap pop: settles in ~150ms with a hair of overshoot.
+const POP = { damping: 14, stiffness: 300 } as const;
+
+type SegmentButtonProps = {
+  label: string;
+  selected: boolean;
+  selectedStyle: StyleProp<ViewStyle>; // caller supplies the semantic fill (pass/fail/na)
+  onPress: () => void;
+};
+
+// One segment of the result control. Data in, one event out — the semantic
+// color mapping stays the screen's knowledge; the pop is self-contained.
+export function SegmentButton({ label, selected, selectedStyle, onPress }: SegmentButtonProps) {
+  const scale = useSharedValue(1);
+  const pop = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  function handlePress() {
+    if (!selected) {
+      scale.value = 0.95;               // snap compressed…
+      scale.value = withSpring(1, POP); // …spring back: feedback for the change
+    }
+    onPress();
+  }
+
+  return (
+    <Animated.View style={[styles.wrap, pop]}>
+      <Pressable onPress={handlePress} style={[styles.btn, selected && selectedStyle]}>
+        <Text style={[styles.text, selected && styles.textSelected]}>{label}</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: { flex: 1 },
+  btn: {
+    paddingVertical: 14,
+    borderRadius: radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: color.border,
+    backgroundColor: color.card,
+    alignItems: "center",
+  },
+  text: { fontSize: font.body, fontWeight: "600", color: color.text },
+  textSelected: { color: color.onFill },
+});
+```
+
+Structure notes: the `Animated.View` wrapper carries `flex: 1` + the animated
+transform; the inner `Pressable` keeps the visual styles moved verbatim from
+the route. (`Animated.createAnimatedComponent(Pressable)` rejected — an extra
+concept to explain for zero gain.) No cleanup needed: no subscriptions exist,
+and Reanimated 4 detaches animations from unmounted components itself.
+
+### File 3 — `app/audit/item/[itemId].tsx`
+
+The `RESULTS.map` `Pressable` block becomes:
+
+```tsx
+{RESULTS.map((value) => (
+  <SegmentButton
+    key={value}
+    label={RESULT_LABELS[value]}
+    selected={result === value}
+    selectedStyle={SELECTED_STYLE[value]}
+    onPress={() => {
+      setResult(value);
+      setError(null);
+    }}
+  />
+))}
+```
+
+Delete the now-unused `segmentBtn`/`segmentText`/`segmentTextSelected` styles
+and the `Pressable` import. **Keep** `segmentPass`/`segmentFail`/`segmentNa`,
+the `SELECTED_STYLE` lookup, and its comment in the route — the pass/fail/na
+mapping is this screen's knowledge, not the button's. Zero behavior change:
+same handler body, same styles applied.
+
+### Docs, same commit
+
+- **TODO.md**: the parked "Reanimated polish" bullet → `[x]` in place,
+  reworded to what shipped (built as §5/P6; the originally sketched
+  status-button-press / list-transitions were superseded by this spec).
+- **TODO_PLAIN_ENGLISH.md**: dated bullet for the two animations; "animations"
+  comes off the after-the-31st line.
+- **DECISIONS.md**: short entry — two idioms on purpose; press-driven over
+  effect-driven (db-seeded selection must never pop); first Reanimated use,
+  no babel/jest work (cross-ref the babel entry).
+- **This file**: §8-style build note appended when it lands; §5's P6 heading
+  gets a "built 2026-07-30" marker.
+
+### Jest / pitfall check (done at plan time)
+
+No test file imports any component, directly or transitively — reanimated
+never enters the jest module graph, so all suites should pass untouched.
+(jest-expo ships reanimated's jest setup anyway, if that ever changes.)
+
+### Verification
+
+- Claude: `npx --no-install tsc --noEmit` clean; code-reviewer agent before
+  commit.
+- Human (Windows): `npx jest`, `npx eslint .`, then on device in Expo Go:
+  1. **Money shot** — airplane mode → complete an audit → History shows gray
+     "Not synced — N waiting" → reconnect → badge sweeps gray→green (~300ms)
+     in place on the mounted card, no remount flicker; label swaps to
+     "Synced ✓". Repeat via the manual Sync now path.
+  2. **No mount animation** — cold-open History with synced audits: static
+     green. Scroll a card out of the viewport and back: static on re-entry.
+  3. **Segment pop** — tapping pops only the tapped segment; re-tapping the
+     selected one does nothing; reopening a saved item shows its seeded
+     selection with no pop.
+  4. **Regression eyeball** — segment sizing/colors identical to before; no
+     Reanimated warning banner at startup.
+
+Sequencing: SegmentButton → route edit → AuditCard → tsc → docs. One small
+commit.

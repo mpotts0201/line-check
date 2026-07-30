@@ -80,8 +80,7 @@ ring, never the data. (Plan and reasoning: SYNC_STATUS_FIX.md.)
   one flat gray. After you approved that on the phone, the stat-tile cleanup
   (P5) landed too: the little Pass/Fail/N/A count boxes that three screens
   each hand-rolled are now one shared component with one look — the History
-  cards' counts got slightly bigger and match the other screens now. Still
-  parked from this plan: the two animations (after the 31st). Waiting on:
+  cards' counts got slightly bigger and match the other screens now. Waiting on:
   a diff review of the stat-tile change, then commit.
 - **We decided the "cumbersome" item flow stays — on purpose.** Tapping into
   each item and pressing Save is three steps, and we're keeping all three: a
@@ -94,10 +93,23 @@ ring, never the data. (Plan and reasoning: SYNC_STATUS_FIX.md.)
   land. Needs two packages installed first (noted in TODO.md). Decision only;
   it's not scheduled ahead of the README and demo video.
 
+## New on July 30 — the two animations (pulled forward)
+
+- These were parked until after the 31st, but the badge animation is the best
+  moment in the whole demo — the phone visibly going from "Not synced" to
+  "Synced ✓" the instant signal comes back — so it got built before the demo
+  video, not after. Two things move now, both tied to real state changes:
+  the History sync badge sweeps gray→green when a background sync lands (no
+  tap, no navigating away), and the Pass/Fail/N/A buttons give a small
+  physical pop when you pick one. Nothing decorative; a screen that opens
+  with old data doesn't animate anything. Two different animation techniques
+  on purpose — one for "a value changed," one for "a tap happened" — and the
+  reasoning is in the decision log.
+
 ## Chores (not blocking)
 - Run eslint on Windows over the recent commits (it can't run on the Linux side).
 
 ## After the 31st (parked)
 - Delete the now-unused failure-counter column from the database.
-- Automatic test runs on GitHub, animations, a proper dev build.
+- Automatic test runs on GitHub, a proper dev build.
 - Photo capture and upload (cut for the window).

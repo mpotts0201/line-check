@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type TextStyle } from "react-native";
+import Animated, { type CSSStyle } from "react-native-reanimated";
 import { type AuditSummary } from "../../db/audits";
 import { type AuditSyncStateRow } from "../../db/syncQueue";
 import { color, font, radius } from "../../theme";
@@ -16,6 +17,17 @@ const BADGE_COLOR = {
   synced: color.success,
   pending: color.muted,
 } as const;
+
+// Module scope: one stable object across every card render (list-item prop rule).
+// CSS-transition semantics animate CHANGES only — a card that mounts already-synced
+// renders green statically; only the live pending→synced flip (flushCount → refresh
+// → new color prop on the mounted card) tweens. Lives outside StyleSheet.create
+// because RN's TextStyle doesn't know the transition keys; CSSStyle<TextStyle> is
+// reanimated's name for "a text style that may carry them."
+const syncColorTransition: CSSStyle<TextStyle> = {
+  transitionProperty: "color",
+  transitionDuration: "300ms",
+};
 
 // Badge text + tint for one audit's card. The lookup can miss only if an audit completed
 // between the History screen's two queries; the fallback reads Not synced for the same
@@ -56,7 +68,9 @@ export function AuditCard({ audit, syncState, onPress }: AuditCardProps) {
         <StatTile label="Fail" value={audit.failCount} tint={color.danger} />
         <StatTile label="N/A" value={audit.naCount} />
       </View>
-      <Text style={[styles.sync, { color: badge.color }]}>{badge.label}</Text>
+      <Animated.Text style={[styles.sync, syncColorTransition, { color: badge.color }]}>
+        {badge.label}
+      </Animated.Text>
     </Pressable>
   );
 }

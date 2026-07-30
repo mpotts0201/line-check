@@ -578,3 +578,50 @@ The polish pass is cosmetics only; no interaction changes.
   three small targets next to a navigation target, worst-case for gloved use.
 - **Confirm-on-exit instead of a Save button** (auto-save drafts on back) —
   rejected: blurs "recorded" vs "abandoned" for no tap savings.
+
+---
+
+## 2026-07-30 — P6 motion: two Reanimated idioms on purpose; press-driven, not effect-driven
+
+**Context:** The parked "Reanimated polish" bullet, built per THEME_POLISH §5/P6
+(implementation plan in §9, build log in §8). First use of react-native-reanimated
+in the app — already installed, and babel-preset-expo auto-injects the worklets
+plugin (see the 2026-07 babel entry), so no config or jest work. Pulled forward
+from post-7/31 because the badge flip is the demo recording's centerpiece.
+
+**Decision:** The two animation moments use two different Reanimated idioms:
+
+- **Badge flip → the CSS-transition API** (`transitionProperty: "color"` on
+  `Animated.Text` in AuditCard). The badge color is *derived state* — it arrives
+  from data (flushCount → refresh → new prop), not from a gesture. A transition
+  declares "when this property changes, tween it," and by web-CSS semantics it
+  animates **changes only, never the initial value** — so "no animation on first
+  mount / FlatList recycle" is guaranteed by construction, with no first-mount
+  ref guard. The whole diff is one constant and `Text` → `Animated.Text`.
+- **Segment pop → `useSharedValue` + `useAnimatedStyle` + `withSpring`**
+  (new `SegmentButton`). A spring is physics responding to an impulse (the
+  tap); CSS timing functions can't express one. Two idioms is not
+  inconsistency — it's the declarative/imperative line the framework itself
+  draws: transitions for state that changes, springs for events that happen.
+
+**The spring is press-driven, not a `selected` effect.** The item screen seeds
+its selection from SQLite on reopen; an effect watching `selected` would pop the
+saved segment on screen open — a mount animation the spec's "state-change
+feedback only" rule forbids. Selection can only change via press, so
+`if (!selected)` inside the press handler is exactly "on becoming selected,"
+and it keeps a tap on the already-selected segment silent for free.
+
+**Alternatives considered:**
+- **One idiom everywhere (classic shared-value for both)** — rejected: the badge
+  would need a shared value, `interpolateColor`, an effect watching the prop,
+  and a first-mount guard — five pieces of machinery to reimplement what the
+  transition annotation gives in two style keys.
+- **CSS keyframe animation for the pop** — rejected: approximating a spring
+  with keyframes trades real physics for a hand-tuned curve and reads worse.
+- **`Animated.createAnimatedComponent(Pressable)`** instead of an
+  `Animated.View` wrapper — rejected: an extra concept to explain for zero gain.
+- **Animating badge opacity alongside color** — rejected: the label text swaps
+  instantly ("Not synced — N waiting" → "Synced ✓"); one `Text` can't crossfade
+  two strings, so an opacity dip would just flicker. Color-only; adding
+  `"opacity"` later is a one-word change if the sweep reads too subtle on
+  device.

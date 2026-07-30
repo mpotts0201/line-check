@@ -2,7 +2,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
 import { useEffect, useState } from "react";
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { PrimaryButton } from "../../../src/components/PrimaryButton";
+import { SegmentButton } from "../../../src/components/SegmentButton";
 import { getAuditItem, updateAuditItem, type AuditItem } from "../../../src/db/audits";
 import { color, font, radius } from "../../../src/theme";
 import { itemSaveSchema } from "../../../src/validation/audit";
@@ -79,23 +79,18 @@ export default function CheckItem() {
       <Text style={styles.heading}>{item.label}</Text>
 
       <View style={styles.segment}>
-        {RESULTS.map((value) => {
-          const selected = result === value;
-          return (
-            <Pressable
-              key={value}
-              onPress={() => {
-                setResult(value);
-                setError(null);
-              }}
-              style={[styles.segmentBtn, selected && SELECTED_STYLE[value]]}
-            >
-              <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>
-                {RESULT_LABELS[value]}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {RESULTS.map((value) => (
+          <SegmentButton
+            key={value}
+            label={RESULT_LABELS[value]}
+            selected={result === value}
+            selectedStyle={SELECTED_STYLE[value]}
+            onPress={() => {
+              setResult(value);
+              setError(null);
+            }}
+          />
+        ))}
       </View>
 
       {requiresTemp && (
@@ -139,20 +134,9 @@ const styles = StyleSheet.create({
   loading: { fontSize: font.body, color: color.muted },
   heading: { fontSize: font.title, fontWeight: "700", marginBottom: 20 },
   segment: { flexDirection: "row", gap: 8, marginBottom: 20 },
-  segmentBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: radius.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: color.border,
-    backgroundColor: color.card,
-    alignItems: "center",
-  },
   segmentPass: { backgroundColor: color.success, borderColor: color.success },
   segmentFail: { backgroundColor: color.danger, borderColor: color.danger },
   segmentNa: { backgroundColor: color.neutral, borderColor: color.neutral },
-  segmentText: { fontSize: font.body, fontWeight: "600", color: color.text },
-  segmentTextSelected: { color: color.onFill },
   field: { marginBottom: 20 },
   fieldLabel: {
     fontSize: font.secondary,

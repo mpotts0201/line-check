@@ -211,7 +211,16 @@ app demo-able for exactly this reason.**
   (list columns explicitly while there).
 - [ ] CI: GitHub Actions running `tsc --noEmit` + `jest` on push/PR (GitHub's
   Linux runners sidestep the Windows/WSL local-command constraint).
-- [ ] Reanimated polish (status button press, list transitions — small).
+- [x] Reanimated polish — built as THEME_POLISH §5/P6 (2026-07-30, pulled
+  forward: the badge flip is the demo's money shot, so it lands before the
+  recording). History sync-badge pending→synced color transition
+  (`AuditCard.tsx`, Reanimated 4 CSS-transition API) + segment-selection scale
+  spring (new `src/components/SegmentButton.tsx`, `withSpring`). The
+  originally sketched status-button press / list transitions were superseded
+  by the P6 spec — state-change feedback only, nothing decorative.
+  Implementation plan + build log: THEME_POLISH §9/§8; idiom tradeoff in
+  DECISIONS 2026-07-30. AC pending: owner diff review, jest + eslint on
+  Windows, §9 device pass. tsc clean ✓.
 - [ ] EAS dev build; re-record the demo on it.
 - [ ] 8a — Photo capture + Storage-bucket upload (cut 2026-07-21; adds a third
   request type to the flush sequence — full spec preserved in TODO_ARCHIVE.md).
