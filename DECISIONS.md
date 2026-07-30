@@ -652,3 +652,42 @@ override — reanimated's CSS module doesn't consult the flag at all (verified i
 the installed source). Revisit if the app ever ships to real users: honoring
 reduce motion for the scale cues (while keeping the color sweep) would be the
 accessible production behavior.
+
+## 2026-07-30 — Signature capture: signature-canvas package over hand-rolled; legacy file API over the SDK 54 class API
+
+**Decision 1 — `react-native-signature-canvas` (WebView) over hand-rolled gesture
+capture.** The package brings signature_pad's mature stroke smoothing and a
+clear/read API for two installs and ~zero custom gesture code; hand-rolling
+(gesture-handler + SVG + view-shot) was a day-plus of edge cases during demo
+week. Owner's explicit call: "a good senior wants practical, not always
+hand-rolled." Capture happens in a full-screen RN `Modal`
+(`src/components/review/SignatureModal.tsx`) — a real signing area for a
+finger, and no ScrollView underneath to steal downward strokes. The components
+live in `src/components/review/`, NOT under `app/` (Expo Router registers
+every file there as a route — CLAUDE.md's convention lines were corrected to
+say so). Design doc: `SIGNATURE_CAPTURE_PROPOSAL.md`.
+
+**Decision 2 — signature is held in screen state and persisted only at
+completion, inside `completeAudit`'s transaction.** `completeAudit` snapshots
+the `audits` row into `sync_queue` within its transaction, so the signature
+URI must ride the same UPDATE — a post-completion write would freeze `null`
+into the queued payload. `completeAudit` gained a required third parameter.
+Corollary accepted on purpose: a signature abandoned with the screen is
+discarded (sign-then-complete is one ceremony; no draft-signature semantics,
+no orphan files). The completion gate lives in `auditCompleteSchema`
+(`signature: z.string().min(1)`), not in the screen. Remote upload of the PNG
+stays deferred alongside photo upload — `flush.ts` passes the local `file://`
+URI to `signature_path` as a documented placeholder.
+
+**Decision 3 — legacy `writeAsStringAsync` over the SDK 54 `File` class API.**
+The first cut used `new File(Paths.document, …).write(base64, { encoding:
+"base64" })` — typings check out, and the option is real in the native module —
+but on device in Expo Go the completion path threw (generic Alert, exception
+not yet captured; the catch now `console.warn`s it). Rather than burn demo-week
+round-trips debugging the new SharedObject layer inside Expo Go — this
+project's third Expo Go quirk after the reduce-motion misreport and the header
+capsule — `src/files/signature.ts` uses `expo-file-system/legacy`'s
+`writeAsStringAsync` with `EncodingType.Base64`: the years-proven path for
+exactly this base64→PNG case. Alternatives: debugging the class API on device
+(deferred — revisit on a dev build), or storing base64 in SQLite (bloats rows
+~20–100KB and diverges from the photoUri file pattern).

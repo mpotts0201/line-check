@@ -25,10 +25,11 @@ export type FlushResult =
 // `photoUri` is deferred to 8a (Storage upload), so it is not sent here.
 //
 // NOTE the remote names are `signature_path` / `photo_path`, NOT `_uri`. Locally these hold a
-// device `file://` URI; remotely they are meant to hold a Storage object path. Until 8a does
-// the upload, `signatureUri` is a T5 placeholder (null in practice), so passing it straight
-// through is harmless — but 8a must map the POST-UPLOAD path here, not the local URI, which
-// would be meaningless to any other device.
+// device `file://` URI; remotely they are meant to hold a Storage object path. `signatureUri`
+// is now real (a local PNG written at completion — see saveSignaturePng), so until the Storage
+// upload lands, the remote column receives a device-local `file://` URI: a known placeholder,
+// meaningless to any other device. The upload work (8a-class, photos + signatures together)
+// must map the POST-UPLOAD path here, not the local URI.
 function toRemoteAudit(p: any): Record<string, unknown> {
   return {
     id: p.id,

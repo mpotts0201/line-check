@@ -43,6 +43,11 @@ const completableItemSchema = z
 
 export const auditCompleteSchema = z.object({
   items: z.array(completableItemSchema).min(1), // an empty audit isn't completable
+  // The captured signature (base64 data URL from the pad). Required: an unsigned
+  // audit isn't completable — the signature IS the attestation. The screen passes
+  // `signature ?? ""` so the unsigned case fails min(1) instead of needing a
+  // nullable branch here.
+  signature: z.string().min(1),
 });
 
 export type AuditCompleteInput = z.infer<typeof auditCompleteSchema>;

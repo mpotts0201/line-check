@@ -41,7 +41,8 @@ async function seed(db: SqlDb): Promise<void> {
   await db.runAsync(
     `INSERT INTO audits (id, locationId, status, startedAt, completedAt, signatureUri, syncStatus)
      VALUES (?, ?, 'complete', ?, ?, ?, 'pending')`,
-    "aud-1", "loc-1", "2026-07-20T10:00:00.000Z", "2026-07-20T10:05:00.000Z", null
+    "aud-1", "loc-1", "2026-07-20T10:00:00.000Z", "2026-07-20T10:05:00.000Z",
+    "file:///doc/signature-aud-1.png"
   );
   const items = [
     { id: "item-1", station: "Line", label: "Cold line temp", result: "pass", temp: 38, note: null },
@@ -59,7 +60,7 @@ async function seed(db: SqlDb): Promise<void> {
   const auditPayload = {
     id: "aud-1", locationId: "loc-1", status: "complete",
     startedAt: "2026-07-20T10:00:00.000Z", completedAt: "2026-07-20T10:05:00.000Z",
-    signatureUri: null, syncStatus: "pending",
+    signatureUri: "file:///doc/signature-aud-1.png", syncStatus: "pending",
   };
   await enqueue(db, "q-aud-1", "audits", "aud-1", auditPayload, "2026-07-20T10:05:00.001Z");
   await enqueue(db, "q-item-1", "audit_items", "item-1",
@@ -112,7 +113,12 @@ describe("flushSyncQueue", () => {
     await flushSyncQueue(db, fake.client);
 
     const remoteAudit = fake.tables.audits.get("aud-1")!;
-    expect(remoteAudit).toMatchObject({ location_id: "loc-1", started_at: "2026-07-20T10:00:00.000Z" });
+    expect(remoteAudit).toMatchObject({
+      location_id: "loc-1",
+      started_at: "2026-07-20T10:00:00.000Z",
+      // Local URI passes through until the Storage upload maps a real path here.
+      signature_path: "file:///doc/signature-aud-1.png",
+    });
     expect(remoteAudit).not.toHaveProperty("locationId");
     expect(remoteAudit).not.toHaveProperty("syncStatus"); // local-only, dropped
     const remoteItem = fake.tables.audit_items.get("item-1")!;

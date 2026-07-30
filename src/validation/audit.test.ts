@@ -38,15 +38,20 @@ describe("itemSaveSchema", () => {
 
 describe("auditCompleteSchema", () => {
   const answered = { result: "pass", tempReading: null, requiresTemp: false };
+  // A stand-in for the pad's base64 data URL — the schema only requires a
+  // non-empty string. Every case includes a valid signature except the two
+  // signature cases themselves, so each test isolates one rule.
+  const signature = "data:image/png;base64,abc123";
 
   it("rejects an empty audit (no items)", () => {
-    const r = auditCompleteSchema.safeParse({ items: [] });
+    const r = auditCompleteSchema.safeParse({ items: [], signature });
     expect(r.success).toBe(false);
   });
 
   it("rejects an audit with any unanswered item", () => {
     const r = auditCompleteSchema.safeParse({
       items: [answered, { result: null, tempReading: null, requiresTemp: false }],
+      signature,
     });
     expect(r.success).toBe(false);
   });
@@ -54,6 +59,7 @@ describe("auditCompleteSchema", () => {
   it("accepts an audit where every item is answered", () => {
     const r = auditCompleteSchema.safeParse({
       items: [answered, { result: "fail", tempReading: null, requiresTemp: false }],
+      signature,
     });
     expect(r.success).toBe(true);
   });
@@ -61,6 +67,7 @@ describe("auditCompleteSchema", () => {
   it("rejects a temp-required item with no reading", () => {
     const r = auditCompleteSchema.safeParse({
       items: [{ result: "pass", tempReading: null, requiresTemp: true }],
+      signature,
     });
     expect(r.success).toBe(false);
   });
@@ -68,7 +75,18 @@ describe("auditCompleteSchema", () => {
   it("accepts a temp-required item that has a reading", () => {
     const r = auditCompleteSchema.safeParse({
       items: [{ result: "pass", tempReading: 40, requiresTemp: true }],
+      signature,
     });
     expect(r.success).toBe(true);
+  });
+
+  it("rejects an unsigned audit (the screen maps null → empty string)", () => {
+    const r = auditCompleteSchema.safeParse({ items: [answered], signature: "" });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a missing signature field entirely", () => {
+    const r = auditCompleteSchema.safeParse({ items: [answered] });
+    expect(r.success).toBe(false);
   });
 });

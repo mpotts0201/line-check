@@ -87,11 +87,14 @@ ring, never the data. (Plan and reasoning: SYNC_STATUS_FIX.md.)
   manager walking a line with wet or gloved hands shouldn't be able to record
   a food-safety result with one stray touch. The friction is the safety.
   Written down in the decision log.
-- **The signature box needs a call: build it or delete it.** Right now it says
-  "coming soon," which is the one visible stub in the app. Leaning toward
-  building it — a real signature is what makes the whole "signed record" idea
-  land. Needs two packages installed first (noted in TODO.md). Decision only;
-  it's not scheduled ahead of the README and demo video.
+- **The signature box needs a call: build it or delete it.** DONE — built on
+  July 30. Tap the box on the review screen, a full-screen pad opens, sign with
+  a finger, Clear to retry, Done to capture. Completing the audit now requires
+  a signature and saves it as a PNG on the phone; it rides the same sync path
+  as everything else. Uploading the image itself to the cloud bucket is still
+  future work (same boat as photos). One loose end at commit time: the very
+  last step (tapping Complete) threw an error on device once — the file-writing
+  code was swapped to the older, battle-tested API and needs one retest.
 
 ## New on July 30 — the two animations (pulled forward)
 

@@ -129,22 +129,25 @@ export async function updateAuditItem(
 }
 
 // Marks a draft audit complete and enqueues it for sync — the UPDATE and the queue
-// inserts commit together in one transaction (T7a). Stamps completedAt; leaves
-// signatureUri (a placeholder in T5) untouched. Uses 'complete' (not 'completed') per
-// the CLAUDE.md status model. LineCheck syncs a *finished* audit as a unit, so only
-// completion enqueues — draft edits stay local (see DECISIONS.md).
+// inserts commit together in one transaction (T7a). Stamps completedAt AND
+// signatureUri in the same UPDATE: the snapshot below is taken inside this
+// transaction, so a signature written after completion would freeze null into the
+// queued payload and the remote would never see it. Uses 'complete' (not
+// 'completed') per the CLAUDE.md status model. LineCheck syncs a *finished* audit
+// as a unit, so only completion enqueues — draft edits stay local (see DECISIONS.md).
 //
 // The status = 'draft' guard does double duty: a re-tap on an already-complete (or
 // missing) audit changes 0 rows, so we enqueue nothing — the guard makes both the
 // completion and the enqueue idempotent, with no duplicate queue rows.
 export async function completeAudit(
   db: SqlDb,
-  auditId: string
+  auditId: string,
+  signatureUri: string
 ): Promise<void> {
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
-      `UPDATE audits SET status = 'complete', completedAt = ? WHERE id = ? AND status = 'draft'`,
-      new Date().toISOString(), auditId
+      `UPDATE audits SET status = 'complete', completedAt = ?, signatureUri = ? WHERE id = ? AND status = 'draft'`,
+      new Date().toISOString(), signatureUri, auditId
     );
     if (res.changes === 0) return; // not a fresh completion → nothing to enqueue
 

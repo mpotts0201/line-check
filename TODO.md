@@ -174,7 +174,16 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
   owner diff review + device look at the History list. tsc clean ✓.
 
 ### Signature: implement or remove (raised 2026-07-29, undecided)
-- [ ] The review screen's Signature section is a dashed "coming soon" placeholder
+- [x] RESOLVED: IMPLEMENTED 2026-07-30 via `react-native-signature-canvas`
+  (owner's call — practical package over hand-rolled). Design doc
+  `SIGNATURE_CAPTURE_PROPOSAL.md`; rationale + the legacy-file-API Expo Go
+  quirk in DECISIONS 2026-07-30. Full-screen modal capture, PNG at completion,
+  URI rides completeAudit's txn; schema gate requires signature. Remote upload
+  still deferred with photos (owner has an unwired Supabase bucket — NEXT).
+  AC pending at commit time: completion-path retest on device (first attempt
+  threw via the SDK 54 File API; swapped to legacy writeAsStringAsync).
+  Original ticket text follows for posterity:
+- The review screen's Signature section WAS a dashed "coming soon" placeholder
   (`app/audit/review/[auditId].tsx`). Decide: **implement** real capture or
   **remove** the section so the demo shows no stubs. Owner leans IMPLEMENT — the
   signature is the credibility beat of the whole "signed food-safety record"
