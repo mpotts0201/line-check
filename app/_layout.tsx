@@ -1,11 +1,11 @@
 import { Link, Stack } from "expo-router";
 import { SQLiteProvider, useSQLiteContext } from "expo-sqlite";
 import { useEffect } from "react";
-import { StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 import { migrate } from "../src/db";
 import { provision } from "../src/db/provision";
 import { startSyncEngine } from "../src/sync/syncEngine";
-import { color, font } from "../src/theme";
+import { color, font, space } from "../src/theme";
 
 // Renders nothing. Exists so the sync engine starts when the app mounts and stops
 // if it ever unmounts. Lives inside SQLiteProvider so it can grab the db handle.
@@ -46,8 +46,19 @@ export default function RootLayout() {
           options={{
             title: "Locations",
             headerRight: () => (
-              <Link href="/history">
-                <Text style={styles.headerLink}>History</Text>
+              // asChild: a real Pressable cell (role, pressed feedback, hitSlop).
+              // Its FRAME is clamped by react-native-screens on iOS 26 (glass
+              // headers), so all sizing lives on the Text below — see headerLink.
+              <Link href="/history" asChild>
+                <Pressable
+                  accessibilityRole="link"
+                  // hitSlop reaches the 44pt tap-target bar without growing the
+                  // cell's measured height inside the fixed-height header.
+                  hitSlop={{ top: 12, bottom: 12 }}
+                  style={({ pressed }) => pressed && styles.pressed}
+                >
+                  <Text style={styles.headerLink}>History</Text>
+                </Pressable>
               </Link>
             ),
           }}
@@ -65,5 +76,15 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   screen: { backgroundColor: color.screen },
   headerTitle: { fontWeight: "600" },
-  headerLink: { fontSize: font.emphasis, color: color.brand, fontWeight: "600" },
+  // Horizontal padding lives on the TEXT, not the wrapper: the iOS 26 glass
+  // capsule sizes from the text node's own box (wrapper frames get clamped by
+  // react-native-screens — verified on device 2026-07-30). This is what keeps
+  // the word off the capsule's rounded sides.
+  headerLink: {
+    fontSize: font.emphasis,
+    color: color.brand,
+    fontWeight: "600",
+    paddingHorizontal: space.lg,
+  },
+  pressed: { opacity: 0.6 },
 });
