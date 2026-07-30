@@ -68,7 +68,7 @@ IDs are client-generated UUIDs (so offline creation never blocks on the server).
 - Functional components + hooks only; no classes
 - Data access goes through a repository layer in `src/db/` — screens never touch SQL directly
 - Sync engine lives in `src/sync/` — isolated and unit-testable without UI
-- Keep components small; co-locate screen-specific components near their route
+- Keep components small; screen-specific components go in `src/components/<screen>/` (e.g. `src/components/history/`), NEVER inside `app/` — Expo Router turns every file under `app/` into a route
 - Descriptive commit messages; one logical change per commit
 - When making a non-obvious tradeoff, append a short entry to `DECISIONS.md` (date, decision, why, alternatives considered)
 
@@ -103,8 +103,9 @@ pre-existing issues outside the diff unless the change makes them worse.
 - Local UI state stays in the component that owns it. Lift state only when two
   siblings need it; reach for global state (Zustand/context) only for genuinely
   app-wide concerns (auth, theme). Flag prop drilling deeper than 2 levels.
-- One component per file. Shared components in `components/`, screen-specific
-  ones co-located with the screen.
+- One component per file. Shared components in `src/components/`, screen-specific
+  ones in `src/components/<screen>/` — never under `app/`, where Expo Router
+  would register them as routes.
 
 ## React Native / Expo specifics
 
