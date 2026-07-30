@@ -237,3 +237,30 @@ natives; signature-canvas is pure JS on top. **Restart Metro after installing.**
 3. **Signer name/title field?** Deliberately out of scope (no auth, no
    identity model in the POC). Flagging so its absence is a decision, not an
    oversight.
+
+---
+
+## Follow-on: display the signature in History (gated 2026-07-30, doc-lite)
+
+Owner asked for the signature on the History side; design agreed in
+conversation, captured here as the plan of record.
+
+- **Where:** the History *detail* screen (`app/history/[auditId].tsx`) only —
+  the list stays a scannable index. Placement is a `ListFooterComponent`
+  below the station sections: paper-form semantics, the signature at the
+  bottom attests everything above it. Section label matches the existing
+  station-header style.
+- **Source:** the LOCAL file (`audits.signatureUri`) via `expo-image` —
+  never the bucket URL. SQLite + local files are the read path; the bucket
+  is a write-only mirror. Works in airplane mode like everything else, and
+  the transparent PNG renders correctly on the card's white background.
+- **No component reuse:** `SignatureBox` is an input control (tap-to-sign /
+  clear states); a readonly mode would be exactly the multi-state branching
+  this repo avoids. Display is ~10 lines of inline JSX in the footer —
+  extract a component only if it ever grows.
+- **Repository:** `Audit` type + `getAudit` gain `signatureUri: string |
+  null`. Rider in the same touch: the query's single-letter aliases
+  (`a`/`l`) are renamed `audits`/`locations` per the repo's SQL readability
+  standard.
+- **Null case:** pre-signature audits omit the section entirely — no empty
+  placeholder (no-stubs stance).

@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import { useLocalSearchParams } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
 import { useEffect, useState } from "react";
@@ -74,6 +75,27 @@ export default function AuditDetail() {
       renderSectionHeader={({ section }) => (
         <Text style={styles.station}>{section.title}</Text>
       )}
+      // Paper-form semantics: the signature sits at the bottom, attesting everything
+      // above it. Rendered from the LOCAL file (never the bucket) — the read path is
+      // SQLite + local files, so this works offline like everything else, and the
+      // transparent PNG reads correctly on the card's white background. Audits that
+      // predate signature capture have no signatureUri and omit the section entirely.
+      ListFooterComponent={
+        audit.signatureUri ? (
+          <View>
+            <Text style={styles.station}>Signature</Text>
+            <View style={styles.signatureCard}>
+              <Image
+                source={{ uri: audit.signatureUri }}
+                style={styles.signatureImage}
+                contentFit="contain"
+                accessible
+                accessibilityLabel="Manager signature"
+              />
+            </View>
+          </View>
+        ) : null
+      }
       renderItem={({ item }) => (
         <View style={styles.row}>
           <View style={styles.rowHeader}>
@@ -127,6 +149,15 @@ const styles = StyleSheet.create({
   resultFail: { color: color.danger },
   resultNa: { color: color.neutral },
   meta: { fontSize: font.note, color: color.text, marginTop: 6 },
+  signatureCard: {
+    backgroundColor: color.card,
+    borderRadius: radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: color.border,
+    overflow: "hidden",
+  },
+  // Same height as the review screen's SignatureBox, so the record echoes the capture.
+  signatureImage: { height: 120 },
 });
 
 // Same semantic coloring as the checklist's status column — a completed audit's

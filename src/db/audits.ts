@@ -186,6 +186,7 @@ export type Audit = {
   status: "draft" | "complete";
   startedAt: string;
   completedAt: string | null;
+  signatureUri: string | null; // local file URI; null for drafts (stamped only by completeAudit) and pre-feature audits
 };
 
 // Single audit + its location name, for the read-only detail screen (History → tap).
@@ -198,11 +199,12 @@ export async function getAudit(
   id: string
 ): Promise<Audit | null> {
   return db.getFirstAsync<Audit>(
-    `SELECT a.id, a.locationId, a.status, a.startedAt, a.completedAt,
-            l.name AS locationName
-     FROM audits a
-     JOIN locations l ON l.id = a.locationId
-     WHERE a.id = ?`,
+    `SELECT audits.id, audits.locationId, audits.status, audits.startedAt,
+            audits.completedAt, audits.signatureUri,
+            locations.name AS locationName
+     FROM audits
+     JOIN locations ON locations.id = audits.locationId
+     WHERE audits.id = ?`,
     id
   );
 }

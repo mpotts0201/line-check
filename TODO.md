@@ -187,9 +187,14 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
   `STORAGE_WIREIN_PROPOSAL.md` (gate passed, owner took all three recs);
   DECISIONS 2026-07-30 has the four calls (inline-in-flush, object path,
   public-bucket posture, seam growth). Owner-side dashboard work DONE: bucket
-  (1MB, image/png), both anon policies. AC pending: device pass — airplane
-  complete → reconnect → PNG visible in bucket browser; jest + eslint on
-  Windows.
+  (1MB, image/png), both anon policies. Device pass DONE (found the
+  select-policy gotcha — three policies now; jest green on Windows).
+- [x] HISTORY DISPLAY (same day, doc-lite follow-on in
+  SIGNATURE_CAPTURE_PROPOSAL.md §Follow-on): History detail renders the
+  signature from the LOCAL file as a ListFooterComponent card below the
+  stations (paper-form semantics); `getAudit`/`Audit` gained signatureUri
+  (+ alias rename a/l → audits/locations per SQL standard); pre-feature
+  audits omit the section. AC pending: owner device look.
   Original ticket text follows for posterity:
 - The review screen's Signature section WAS a dashed "coming soon" placeholder
   (`app/audit/review/[auditId].tsx`). Decide: **implement** real capture or
