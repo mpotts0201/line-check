@@ -97,8 +97,30 @@ ring, never the data. (Plan and reasoning: SYNC_STATUS_FIX.md.)
   Supabase storage bucket first, then the audit rows point at it. The bucket is
   public-read on purpose for the demo (documented, with the guardrails: capped
   file size, PNG-only, unguessable names). Photos remain the future half of
-  this pattern. Needs one device test: complete an audit in airplane mode,
-  reconnect, then see the image appear in the Supabase dashboard.
+  this pattern. Device-tested end-to-end on July 30 — including surviving a
+  real sync failure (a missing bucket permission) exactly the way the design
+  promised: the audit waited safely on the phone and went up on the next try.
+  The signature also now shows at the bottom of a past audit's detail screen —
+  the complete signed record in one view.
+
+## Next session — the send-out push (everything is in order now)
+
+1. **README cleanup** — demo GIF, a simple architecture picture, and an
+   honesty pass: the signature story is real now and goes IN; photos stay
+   honestly out.
+2. **Demo recording** — airplane mode, do an audit start to finish, reconnect,
+   watch the badge flip. End on the past-audit screen showing the signature.
+   (Heads-up: the Supabase dashboard's file preview shows the signature as
+   blank — the image has a transparent background and the dashboard is dark.
+   Open the image's public link in a browser instead. Also delete the tiny
+   red test pixel from the bucket first.)
+3. **Shareable builds (maybe)** — look into whether an installable version is
+   cheap to produce. Android likely yes (a link anyone can install); iPhone
+   needs an Apple Developer account, so it may not be worth it versus "GIF +
+   repo link." Investigate first, don't burn the day.
+4. **Interview prep** — hard-question drill on the whole project: why the sync
+   design, why the rewrite, the schema-drift bug story, why a public bucket is
+   defensible, and the honest AI-assisted-work answer.
 
 ## New on July 30 — the two animations (pulled forward)
 

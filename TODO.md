@@ -209,15 +209,39 @@ demo-able** — if the 31st arrives mid-refactor, ship from wherever we are.
   `signature_path` mapping is 8a-class work). Not scheduled — Send-out
   essentials come first.
 
-### Send-out essentials (was T9 — deadline scope)
-- [ ] README: demo GIF, architecture diagram, link DECISIONS.md, note the test
-  suite. (The known-limitations story lands in R5.)
-- [ ] Demo recording: airplane-mode end-to-end.
+### Send-out essentials (was T9 — deadline scope) — NEXT SESSION, in this order
+- [ ] README cleanup: demo GIF, architecture diagram, link DECISIONS.md, note
+  the test suite. Accuracy pass cuts BOTH ways now: the signature story is
+  REAL and belongs in (capture → bucket upload → History display, committed
+  2026-07-30, four commits `202f99e`→`044db1c`), while photos remain honestly
+  absent (8a-cut). Known-limitations section already carries the sync + storage
+  posture entries.
+- [ ] Demo recording: airplane-mode end-to-end. Closing shot = History detail
+  with the signature at the bottom (the full "signed food-safety record" in
+  one screen). Bucket beat: open the PNG's public URL in a browser (dashboard's
+  dark preview tile renders the transparent PNG blank-looking — known, not a
+  bug); delete `diag-test2.png` (1px diagnostic debris) from the bucket first.
+- [ ] Shareable builds — INVESTIGATE first, don't sink the day into it: EAS
+  Build internal distribution. Android is the easy win (APK/AAB installable
+  from a link, no store). iOS ad-hoc needs an Apple Developer account +
+  registered device UDIDs — decide if it's worth it vs "demo GIF + repo" for
+  send-out. All eas commands run by the human on Windows; note the project
+  currently targets Expo Go (SDK 54) and a dev/preview build is a deliberate
+  step away from that — flag config changes before making them.
+- [ ] Interview prep: quiz the owner on the tough questions. Source material:
+  DECISIONS.md end-to-end (esp. the sync rewrite, friction-as-failsafe,
+  signature arc), TODO_ARCHIVE.md's noted weak spots (7f schema drift,
+  8b-ii.5, T7 Q&A), the AI-assisted-work framing (see memory: the agreed
+  honest defense), and the storage posture (why public bucket is defensible,
+  what production changes). Format: hard questions first, no softballs;
+  owner answers out loud, then gap-fill.
 
 ### Carry-over debt (not blocking)
 - [ ] Windows eslint sweep: commits `2f9d336`, `d963d56`, 8b-ii (`9d96ff1`),
   8b-ii.5 (`47b003c`), plus each R commit as it lands — ESLint can't execute in
-  WSL2, so Gate 0 is only half-verified from this side.
+  WSL2, so Gate 0 is only half-verified from this side. NOW ALSO: the theme
+  commits (`de077ed`, `5fb2956`, `97efcaa`, `08c8dde`) and the 2026-07-30
+  signature arc (`202f99e`, `4522a67`, `17d87ea`, `044db1c`).
 
 **Deadline (set 2026-07-21): applications go out 2026-07-31 — a DATE, not a
 state. If work is unfinished on the 31st, send anyway. Every R bullet leaves the
